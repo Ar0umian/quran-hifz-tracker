@@ -470,3 +470,167 @@ window.quranSelfTest=function(){
   eq('الجزء 30 يبدأ 582',juzOf(582),30);
   console.log(r.join('\n')); return r;
 };
+
+/* ===================== الجزء 3: عرض لوحة اليوم ===================== */
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const cnt=a=>(a&&a.length?a.length:0)+' صفحة';
+
+function card(title,rows,extra){
+  return '<div class="card"><h3>'+title+'</h3>'+
+    rows.map(r=>'<div class="row"><span class="label">'+r[0]+'</span><span class="val">'+r[1]+'</span></div>').join('')+
+    (extra||'')+'</div>';
+}
+
+function renderToday(){
+  const t=todayStr(), k=kind(t), rec=state.days[t], done=!!(rec&&rec.done);
+  const before=t<state.settings.startDate;
+  $('#todayHeader').textContent=fmtAr(t);
+
+  /* ---------- اللافتة العلوية ---------- */
+  const missed=missedDays();
+  let banner='';
+  if(before){
+    banner='<div class="banner">🗓️ تبدأ الخطة يوم '+fmtAr(state.settings.startDate)+'</div>';
+  }else if(k==='fri'){
+    banner='<div class="banner rest">🌿 الجمعة إجازة وراحة تامة، لا حفظ ولا مراجعة اليوم.</div>';
+  }else if(done){
+    banner='<div class="banner rest">✅ تم إنجاز مهام اليوم، تقبّل الله منكِ.</div>';
+  }else if(k==='sat'){
+    banner='<div class="banner">🔄 السبت: مراجعة أسبوعية شاملة.</div>';
+  }else if(missed.length){
+    banner='<div class="banner late">⏳ فاتكِ '+missed.length+' يوم عمل، ودُفعت المهام غير المنجزة إلى اليوم تلقائياً. يمكنكِ أيضاً تعويض يوم فائت.</div>';
+  }else{
+    banner='<div class="banner">📍 مهام اليوم جاهزة، بالتوفيق إن شاء الله.</div>';
+  }
+  $('#todayBanner').innerHTML=banner;
+
+  /* ---------- مهام اليوم والتحضير ---------- */
+  const nd=nextWorkDate();
+  const nxt=buildWorkTask(snapFromState(),nd);
+  let cards='';
+  let tomorrow,week,juz=dailyJuz(t);
+
+  if(k==='work'&&!before){
+    let T;
+    if(done) T={new:rec.new||[],near:rec.near||[],far:rec.far||[],farTotal:null};
+    else T=todayTask();
+
+    cards+=card('📖 الحفظ الجديد',[
+      ['الصفحات',esc(fmtPages(T.new))],
+      ['العدد',cnt(T.new)],
+      ['الجزء',T.new.length?String(juzOf(T.new[0])):'—']
+    ], T.new.length?'':'<p class="small">لا توجد صفحات جديدة، أتممتِ المصحف أو بلغتِ الصفحة 604 🎉</p>');
+
+    if(done){
+      tomorrow=nxt.new;
+      week=(dow(nd)===0)?takeNew(state.nextPage,state.settings.daily*5):nxt.week;
+    }else{
+      tomorrow=T.tomorrow;
+      week=T.week;
+    }
+
+    cards+=card('🔁 المراجعة',[
+      ['الماضي القريب',esc(fmtPages(T.near))+' <span class="small">('+cnt(T.near)+')</span>'],
+      ['الماضي البعيد',esc(fmtPages(T.far))+' <span class="small">('+cnt(T.far)+')</span>']
+    ], T.farTotal!=null?'<p class="small">إجمالي الماضي البعيد: '+T.farTotal+' صفحة، والمؤشر يلتف تلقائياً عند النهاية.</p>':'');
+
+  }else if(k==='sat'&&!before){
+    const T=done?{weekNew:rec.weekNew||[],old3:rec.old3||[],old3juz:[]}:todayTask();
+    cards+=card('🔄 المراجعة الأسبوعية الشاملة',[
+      ['محفوظ هذا الأسبوع',esc(fmtPages(T.weekNew))+' <span class="small">('+cnt(T.weekNew)+')</span>'],
+      ['آخر 3 أجزاء من القديم',esc(fmtPages(T.old3))+' <span class="small">('+cnt(T.old3)+')</span>']
+    ], (T.old3juz&&T.old3juz.length)?'<p class="small">الأجزاء: '+T.old3juz.join('، ')+'</p>':'');
+
+    const notes=(state.notes||[]).slice().reverse();
+    if(notes.length){
+      cards+=card('📝 المتشابهات والتلكؤ',[],
+        notes.slice(0,12).map(n=>'<div class="note-item"><span><b>'+esc(n.ref)+'</b> — '+esc(n.text)+'</span></div>').join(''));
+    }else{
+      cards+=card('📝 المتشابهات والتلكؤ',[],'<p class="small">لا توجد ملاحظات مسجّلة بعد.</p>');
+    }
+    tomorrow=nxt.new;
+    week=takeNew(state.nextPage,state.settings.daily*5);
+
+  }else if(k==='fri'){
+    cards+=card('🌿 يوم راحة',[['المهام','لا شيء اليوم']],
+      '<p class="small">لا تُرحَّل إلى الجمعة أي مهام. استعدّي ليوم السبت للمراجعة الأسبوعية.</p>');
+    tomorrow=nxt.new;
+    week=takeNew(state.nextPage,state.settings.daily*5);
+  }
+
+  if(!before){
+    cards+=card('🌙 التحضير',[
+      ['ورد الغد (التحضير الليلي)',esc(fmtPages(tomorrow))],
+      ['الأسلوب','استماع 3 مرات + قراءة 5 مرات + هوامش وروابط'],
+      ['تحضير الأسبوع القادم',esc(fmtPages(week))+' <span class="small">('+cnt(week)+')</span>'],
+      ['الورد اليومي','قراءة الجزء '+juz]
+    ]);
+  }
+  $('#todayCards').innerHTML=cards;
+
+  /* ---------- الأزرار ---------- */
+  const cb=$('#confirmBtn'), mb=$('#makeupBtn'), ub=$('#undoBtn');
+  const anyDone=Object.keys(state.days).some(d=>state.days[d]&&state.days[d].done);
+  cb.style.display=(k==='fri')?'none':'block';
+  cb.disabled=done||before;
+  cb.textContent=done?'✅ تم التأكيد اليوم':(k==='sat'?'✅ تأكيد إتمام المراجعة الأسبوعية':'✅ تأكيد إتمام مهام اليوم');
+  mb.disabled=!missed.length;
+  mb.textContent=missed.length?('⏳ تعويض يوم فائت ('+missed.length+')'):'⏳ لا أيام فائتة';
+  ub.disabled=!anyDone;
+
+  let hint='';
+  if(before) hint='لم تبدأ الخطة بعد.';
+  else if(k==='fri') hint='استمتعي بيوم الراحة 🌿';
+  else if(done) hint='يمكنكِ التراجع عن آخر تأكيد إن ضغطتِ عليه بالخطأ.';
+  else hint='اضغطي التأكيد بعد إتمام كل المهام أعلاه. وإن لم تؤكّدي اليوم، تُدفع المهام غير المنجزة تلقائياً إلى يوم العمل التالي.';
+  $('#confirmHint').textContent=hint;
+}
+
+/* ---------- التبويبات والرسم الشامل ---------- */
+function renderAll(){
+  renderToday();
+  if(typeof renderCalendar==='function') renderCalendar();
+  if(typeof renderMap==='function') renderMap();
+  if(typeof renderNotes==='function') renderNotes();
+  if(typeof renderSettings==='function') renderSettings();
+}
+function showView(v){
+  $$('#tabs button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
+  $$('.view').forEach(s=>s.classList.toggle('active',s.id==='view-'+v));
+  renderAll();
+  window.scrollTo(0,0);
+}
+
+/* ---------- ربط أحداث لوحة اليوم ---------- */
+function bindToday(){
+  $$('#tabs button').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
+
+  /* زر التراجع (يُنشأ هنا ويُضاف بجانب زر التعويض) */
+  if(!$('#undoBtn')){
+    const u=document.createElement('button');
+    u.id='undoBtn'; u.className='btn warn'; u.textContent='↩️ تراجع عن آخر تأكيد';
+    $('#makeupBtn').parentNode.appendChild(u);
+  }
+
+  $('#confirmBtn').addEventListener('click',()=>{
+    const t=todayStr();
+    if(confirmDay(t)){toast('تم تأكيد مهام اليوم ✅');}
+    renderAll();
+  });
+  $('#makeupBtn').addEventListener('click',()=>{
+    const m=missedDays(); if(!m.length) return;
+    if(!confirm('سيُنجَز عمل يوم إضافي الآن ويُسجَّل على: '+fmtAr(m[0])+'\nهل أنتِ متأكدة؟')) return;
+    const d=makeupDay();
+    toast(d?('تم تعويض '+fmtAr(d)):'تعذّر التعويض');
+    renderAll();
+  });
+  $('#undoBtn').addEventListener('click',()=>{
+    if(!confirm('سيتم التراجع عن آخر تأكيد مسجّل، هل أنتِ متأكدة؟')) return;
+    const d=undoLast();
+    toast(d?('تم التراجع عن '+fmtAr(d)):'لا يوجد ما يُتراجع عنه');
+    renderAll();
+  });
+
+  /* تحديث تلقائي عند العودة للتبويب أو تغيّر اليوم */
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden) renderAll();});
+}
