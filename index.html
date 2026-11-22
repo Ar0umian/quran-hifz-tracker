@@ -634,3 +634,198 @@ function bindToday(){
   /* تحديث تلقائي عند العودة للتبويب أو تغيّر اليوم */
   document.addEventListener('visibilitychange',()=>{if(!document.hidden) renderAll();});
 }
+
+/* ===================== الجزء 4: التقويم والخريطة والإعدادات ===================== */
+let calMode='month', calCursor=todayStr(), selDate=todayStr();
+const ICONS={done:'✅',today:'📍',future:'📅',late:'⏳',fri:'🌿',sat:'🔄',none:''};
+const STATUS_AR={done:'منجز',today:'اليوم',future:'مجدول',late:'مؤجّل',fri:'إجازة',sat:'مراجعة أسبوعية',none:'قبل بداية الخطة'};
+const shortAr=s=>{const d=parseDate(s);return d.getDate()+' '+MONTHS_AR[d.getMonth()];};
+const shiftMonth=(s,n)=>{const d=parseDate(s);d.setDate(1);d.setMonth(d.getMonth()+n);return fmtDate(d);};
+const rowsHtml=r=>r.map(x=>'<div class="row"><span class="label">'+x[0]+'</span><span class="val">'+x[1]+'</span></div>').join('');
+
+/* ---------- التقويم ---------- */
+function renderCalendar(){
+  const grid=$('#calGrid'); if(!grid) return;
+  $('#calMode').value=calMode;
+  let start,end,title;
+  if(calMode==='month'){
+    const d=parseDate(calCursor);
+    start=fmtDate(new Date(d.getFullYear(),d.getMonth(),1,12));
+    end=fmtDate(new Date(d.getFullYear(),d.getMonth()+1,0,12));
+    title=MONTHS_AR[d.getMonth()]+' '+d.getFullYear();
+  }else{
+    start=addDays(calCursor,-dow(calCursor)); end=addDays(start,6);
+    title='أسبوع '+shortAr(start)+' – '+shortAr(end)+' '+parseDate(end).getFullYear();
+  }
+  $('#calTitle').textContent=title;
+  const proj=project(end);
+  let html=DAYS_AR.map(n=>'<div class="cal-dow">'+n+'</div>').join('');
+  if(calMode==='month'){for(let i=0;i<dow(start);i++) html+='<div class="cal-cell empty"></div>';}
+  let d=start,g=0;
+  while(d<=end&&g++<40){
+    const info=dayInfo(d,proj);
+    const cls=['cal-cell',info.status==='none'?'future':info.status];
+    if(info.isToday&&info.status==='done') cls.push('today');
+    if(d===selDate) cls.push('sel');
+    html+='<div class="'+cls.join(' ')+'" data-date="'+d+'"><span class="n">'+parseDate(d).getDate()+'</span><span class="ic">'+ICONS[info.status]+'</span></div>';
+    d=addDays(d,1);
+  }
+  grid.innerHTML=html;
+  renderDayDetail();
+}
+
+function renderDayDetail(){
+  const box=$('#dayDetail'); if(!box||!selDate) return;
+  const info=dayInfo(selDate,null);
+  let html='<h3>'+fmtAr(selDate)+' <span class="tag '+(info.status==='late'?'red':(info.status==='sat'?'blue':(info.status==='fri'?'':'gold')))+'">'+STATUS_AR[info.status]+'</span></h3>';
+  const rec=info.rec;
+  if(rec&&rec.done){
+    if(rec.kind==='work'){
+      html+=rowsHtml([
+        ['الحفظ الجديد',esc(fmtPages(rec.new))],
+        ['الماضي القريب',esc(fmtPages(rec.near))],
+        ['الماضي البعيد',esc(fmtPages(rec.far))]
+      ]);
+    }else{
+      html+=rowsHtml([
+        ['محفوظ الأسبوع',esc(fmtPages(rec.weekNew))],
+        ['آخر 3 أجزاء من القديم',esc(fmtPages(rec.old3))]
+      ]);
+    }
+    if(rec.makeup) html+='<p class="small">سُجّل هذا اليوم بالتعويض.</p>';
+  }else if(info.status==='none'){
+    html+='<p class="small">هذا اليوم قبل بداية الخطة.</p>';
+  }else if(info.kind==='fri'){
+    html+='<p class="small">إجازة رسمية وراحة تامة، لا حفظ ولا مراجعة ولا ترحيل مهام إليها.</p>';
+  }else if(info.status==='late'){
+    html+='<p class="small">لم يُؤكَّد هذا اليوم، فدُفعت مهامه تلقائياً إلى أول يوم عمل قادم. يمكنكِ تعويضه من لوحة اليوم.</p>';
+  }else{
+    const t=project(selDate)[selDate];
+    if(!t){html+='<p class="small">لا تتوفر تفاصيل لهذا اليوم.</p>';}
+    else if(t.kind==='work'){
+      html+=rowsHtml([
+        ['الحفظ الجديد',esc(fmtPages(t.new))],
+        ['ورد الغد (تحضير)',esc(fmtPages(t.tomorrow))],
+        ['تحضير الأسبوع القادم',esc(fmtPages(t.week))],
+        ['الماضي القريب',esc(fmtPages(t.near))],
+        ['الماضي البعيد',esc(fmtPages(t.far))],
+        ['الورد اليومي','قراءة الجزء '+t.juz]
+      ]);
+      html+='<p class="small">المهام المستقبلية متوقعة بناءً على إنجازكِ الحالي، وقد تتغير إن تأخرتِ.</p>';
+    }else if(t.kind==='sat'){
+      html+=rowsHtml([
+        ['محفوظ الأسبوع (متوقع)',esc(fmtPages(t.weekNew))],
+        ['آخر 3 أجزاء من القديم',esc(fmtPages(t.old3))]
+      ]);
+    }
+  }
+  box.innerHTML=html;
+}
+
+/* ---------- خريطة المصحف ---------- */
+function renderMap(){
+  const g=$('#mapGrid'); if(!g) return;
+  const m=mapData();
+  let html='';
+  for(let p=1;p<=MAXP;p++){
+    const c=[ 'pg' ]; if(m.cls[p]) c.push(m.cls[p]); if(m.todaySet.has(p)) c.push('today');
+    html+='<div class="'+c.join(' ')+'" data-p="'+p+'">'+p+'</div>';
+  }
+  g.innerHTML=html;
+  $('#mapStats').textContent='المحفوظ: '+m.memorized+' من 604 صفحة ('+m.percent+'%) — منها '+m.newPath+' صفحة في المسار الجديد — الماضي القريب: '+m.near+' صفحة. الإطار الأحمر = حفظ اليوم.';
+}
+
+/* ---------- المتشابهات ---------- */
+function renderNotes(){
+  const box=$('#notesList'); if(!box) return;
+  if(!state.notes.length){box.innerHTML='<p class="small">لا توجد ملاحظات بعد.</p>';return;}
+  box.innerHTML=state.notes.map((n,i)=>({n,i})).reverse().map(x=>
+    '<div class="note-item"><span><b>'+esc(x.n.ref)+'</b> — '+esc(x.n.text)+'</span>'+
+    '<button class="btn warn" data-del="'+x.i+'" style="padding:2px 12px">حذف</button></div>').join('');
+}
+
+/* ---------- الإعدادات ---------- */
+function renderSettings(){
+  const box=$('#view-settings'); if(!box) return;
+  if(box.contains(document.activeElement)&&document.activeElement.tagName!=='BUTTON') return;
+  const s=state.settings;
+  $('#setStart').value=s.startPage; $('#setDaily').value=s.daily; $('#setFar').value=String(s.far);
+  if(![...$('#setFar').options].some(o=>o.value===String(s.far))){
+    const o=document.createElement('option'); o.value=String(s.far); o.textContent=s.far+' صفحة'; $('#setFar').appendChild(o);
+    $('#setFar').value=String(s.far);
+  }
+  $('#setNear').value=s.near; $('#setOld').value=s.old; $('#setStartDate').value=s.startDate;
+}
+
+/* ---------- التصدير والاستيراد ---------- */
+function exportJSON(){
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download='quran-plan-backup-'+todayStr()+'.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  toast('تم تصدير النسخة الاحتياطية');
+}
+function importJSON(file){
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const o=JSON.parse(r.result);
+      if(!o||typeof o!=='object'||!o.settings||!Array.isArray(o.newLog)) throw new Error('bad');
+      if(!confirm('سيتم استبدال بياناتكِ الحالية بالنسخة المستوردة، هل أنتِ متأكدة؟')) return;
+      state=normalizeState(o); save(); renderAll(); toast('تم استيراد النسخة بنجاح ✅');
+    }catch(e){toast('الملف غير صالح');}
+  };
+  r.readAsText(file);
+}
+
+/* ---------- الربط والتشغيل ---------- */
+function bindRest(){
+  $('#calPrev').addEventListener('click',()=>{calCursor=calMode==='month'?shiftMonth(calCursor,-1):addDays(calCursor,-7);renderCalendar();});
+  $('#calNext').addEventListener('click',()=>{calCursor=calMode==='month'?shiftMonth(calCursor,1):addDays(calCursor,7);renderCalendar();});
+  $('#calMode').addEventListener('change',e=>{calMode=e.target.value;renderCalendar();});
+  $('#calGrid').addEventListener('click',e=>{
+    const c=e.target.closest('.cal-cell[data-date]'); if(!c) return;
+    selDate=c.dataset.date; renderCalendar();
+  });
+  $('#mapGrid').addEventListener('click',e=>{
+    const c=e.target.closest('.pg'); if(!c) return;
+    const p=+c.dataset.p; toast('صفحة '+p+' — الجزء '+juzOf(p));
+  });
+  $('#noteSaveBtn').addEventListener('click',()=>{
+    const ref=$('#noteRef').value.trim(), text=$('#noteText').value.trim();
+    if(!ref&&!text){toast('اكتبي رقم الصفحة أو الملاحظة');return;}
+    state.notes.push({ref:ref||'—',text:text,at:new Date().toISOString()});
+    save(); $('#noteRef').value=''; $('#noteText').value=''; renderNotes(); renderToday(); toast('تمت إضافة الملاحظة');
+  });
+  $('#notesList').addEventListener('click',e=>{
+    const b=e.target.closest('[data-del]'); if(!b) return;
+    state.notes.splice(+b.dataset.del,1); save(); renderNotes(); renderToday();
+  });
+  $('#saveSettings').addEventListener('click',()=>{
+    applySettings({startPage:$('#setStart').value,daily:$('#setDaily').value,far:$('#setFar').value,
+      near:$('#setNear').value,old:$('#setOld').value,startDate:$('#setStartDate').value});
+    document.activeElement&&document.activeElement.blur();
+    renderAll(); toast('تم حفظ الإعدادات ✅');
+  });
+  $('#exportBtn').addEventListener('click',exportJSON);
+  $('#importFile').addEventListener('change',e=>{
+    const f=e.target.files[0]; if(f) importJSON(f); e.target.value='';
+  });
+  $('#resetBtn').addEventListener('click',()=>{
+    if(!confirm('سيتم مسح كل البيانات نهائياً. يُنصح بتصدير نسخة احتياطية أولاً. متابعة؟')) return;
+    resetAll(); renderAll(); toast('تم مسح البيانات');
+  });
+}
+
+function init(){
+  bindToday();
+  bindRest();
+  renderAll();
+  let last=todayStr();
+  setInterval(()=>{const n=todayStr();if(n!==last){last=n;calCursor=n;selDate=n;renderAll();}},60000);
+}
+init();
+</script>
+</body>
+</html>
