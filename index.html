@@ -314,11 +314,14 @@ function takeNew(from,count){
 }
 const after=(pages,from)=>pages.length?pages[pages.length-1]+1:from;
 
-/* الماضي البعيد الدوّار: q صفحة بعد المؤشر، تلتف من البداية، بلا تكرار (q ≤ عدد الصفحات) */
+/* الماضي البعيد: الحصة تلقائية = كل الرصيد حتى سقف 60، وبعده لوب دوّار */
+const FAR_CAP=60;
+function farQuota(total){return Math.min(total,FAR_CAP);}
 function farBatch(far,ptr,q){
   const n=far.length; if(!n) return [];
-  q=Math.min(q,n);
-  let i=far.findIndex(p=>p>ptr); if(i<0) i=0;
+  if(n<=FAR_CAP) return far.slice();          // رصيد صغير: راجعي كله كل يوم بلا التفاف
+  q=Math.min(q,FAR_CAP,n);
+  let i=far.findIndex(p=>p>ptr); if(i<0) i=0; // أول صفحة بعد المؤشر، وإن انتهى الرصيد نرجع للبداية
   const out=[]; for(let k=0;k<q;k++) out.push(far[(i+k)%n]);
   return out;
 }
@@ -344,9 +347,11 @@ function buildWorkTask(S,date){
   const near=nl.slice(-c.near);                               // الماضي القريب (آخر N صفحة)
   const nearSet=new Set(near);
   const mem=[...new Set([...getOld(),...nl])].sort((a,b)=>a-b);
-  const far=mem.filter(p=>!nearSet.has(p));                   // البعيد = الكل ما عدا القريب
-  const farPages=farBatch(far,S.farPtr,c.far);
-  return {kind:'work',date,new:nw,tomorrow:tm,week,near,far:farPages,farTotal:far.length,juz:dailyJuz(date)};
+  const far=mem.filter(p=>!nearSet.has(p));                   // البعيد = الكل ما عدا القريب (الخارج من القريب ينضم تلقائياً)
+  const quota=farQuota(far.length);
+  const farPages=farBatch(far,S.farPtr,quota);
+  return {kind:'work',date,new:nw,tomorrow:tm,week,near,far:farPages,farTotal:far.length,
+          farQuota:quota,farAll:far.length<=FAR_CAP,juz:dailyJuz(date)};
 }
 function buildSatTask(S,date){
   const lo=addDays(date,-6),hi=addDays(date,-1);
@@ -363,7 +368,7 @@ function taskFor(S,date){
 function advance(S,t){
   if(t.kind!=='work') return;
   if(t.new.length){S.newLog.push({date:t.date,pages:t.new.slice()});S.nextPage=t.new[t.new.length-1]+1;}
-  if(t.far.length) S.farPtr=t.far[t.far.length-1];
+  if(t.far.length) S.farPtr=t.farAll?0:t.far[t.far.length-1]; // رصيد ≤60: المؤشر يعود للصفر ليبدأ اللوب من أول الرصيد
 }
 
 /* ---------- الترحيل والإسقاط على المستقبل ---------- */
@@ -747,13 +752,26 @@ function renderNotes(){
 /* ---------- الإعدادات ---------- */
 function renderSettings(){
   const box=$('#view-settings'); if(!box) return;
+  /* الحصة التلقائية للماضي البعيد (قراءة فقط) */
+  const sel=$('#setFar');
+  if(sel){
+    sel.style.display='none';
+    if(sel.previousElementSibling) sel.previousElementSibling.style.display='none';
+    let info=$('#farAuto');
+    if(!info){
+      info=document.createElement('div'); info.id='farAuto'; info.className='banner';
+      sel.parentNode.insertBefore(info,sel);
+    }
+    const t=buildWorkTask(snapFromState(),nextWorkDate());
+    info.innerHTML='<b>مراجعة الماضي البعيد (تلقائية)</b><br>'+
+      'الرصيد الحالي: '+t.farTotal+' صفحة — حصة اليوم: <b>'+t.farQuota+' صفحة</b><br>'+
+      '<span class="small">'+(t.farAll
+        ?'الرصيد أقل من أو يساوي 60، فتُراجعين كامل الرصيد يومياً، وتتصاعد الحصة مع خروج صفحتين جديدتين من الماضي القريب كل يوم حفظ حتى سقف 60 صفحة.'
+        :'تجاوز الرصيد 60 صفحة، فالحصة ثابتة على 60 صفحة ويدور المؤشر في لوب مع التفاف تلقائي إلى بداية الرصيد عند نهايته، ويُحفظ موضعه لليوم التالي.')+'</span>';
+  }
   if(box.contains(document.activeElement)&&document.activeElement.tagName!=='BUTTON') return;
   const s=state.settings;
-  $('#setStart').value=s.startPage; $('#setDaily').value=s.daily; $('#setFar').value=String(s.far);
-  if(![...$('#setFar').options].some(o=>o.value===String(s.far))){
-    const o=document.createElement('option'); o.value=String(s.far); o.textContent=s.far+' صفحة'; $('#setFar').appendChild(o);
-    $('#setFar').value=String(s.far);
-  }
+  $('#setStart').value=s.startPage; $('#setDaily').value=s.daily;
   $('#setNear').value=s.near; $('#setOld').value=s.old; $('#setStartDate').value=s.startDate;
 }
 
