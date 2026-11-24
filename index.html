@@ -79,6 +79,18 @@ textarea{min-height:80px;resize:vertical}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--green-d);color:#fff;padding:10px 22px;border-radius:999px;opacity:0;pointer-events:none;transition:opacity .3s;z-index:9}
 #toast.show{opacity:1}
 @media(max-width:560px){.cal-cell{min-height:52px;font-size:.75rem}.card{padding:14px}}
+/* الحساب والمزامنة */
+.modal-bg{position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(20,30,25,.55);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20}
+.modal{background:#fff;border-radius:var(--radius);padding:20px;max-width:420px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+.modal h3{margin:0 0 8px;color:var(--green-d)}
+.modal.danger h3{color:var(--red)}
+.btn.danger{background:var(--red);color:#fff}
+.btn.danger:hover{background:#8f352d}
+.btn.google{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.btn.google:hover{background:#f3f0e4}
+.acc-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.acc-user{font-weight:700;word-break:break-all}
+.acc-msg{min-height:1.4em;color:var(--red);font-size:.85rem;margin:6px 0 0}
 </style>
 </head>
 <body>
@@ -198,6 +210,23 @@ textarea{min-height:80px;resize:vertical}
 
 <div id="toast"></div>
 
+<!-- Firebase SDK (نسخة compat بدون أدوات بناء) -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script>
+/* ===================================================
+   مكان لصق firebaseConfig الخاص بتطبيق الويب
+   (أو استخدمي أمر الخطوة الثالثة ليلصقه عنكِ)
+   =================================================== */
+window.FIREBASE_CONFIG = {
+  apiKey: "الصقي_apiKey_هنا",
+  authDomain: "quran-plan-d3bbc.firebaseapp.com",
+  projectId: "quran-plan-d3bbc",
+  messagingSenderId: "756687017037",
+  appId: "الصقي_appId_هنا"
+};
+</script>
 <script>
 // ===== نهاية الجزء 1: سيُكمل الجزء 2 من هنا =====
 
@@ -254,7 +283,7 @@ function toast(m){
 
 /* ---------- الحالة والتخزين ---------- */
 function defaultState(){
-  return {v:1,
+  return {v:1,updatedAt:0,
     settings:{startPage:2,daily:2,far:10,near:10,old:'1-1',startDate:todayStr()},
     nextPage:2,      // الصفحة التالية في مسار الحفظ الجديد
     farPtr:0,        // آخر صفحة روجعت في الماضي البعيد (مؤشر دوّار بالرقم لا بالفهرس)
@@ -272,21 +301,36 @@ function normalizeState(o){
   s.near=clamp(parseInt(s.near)||10,1,60);
   s.old=String(s.old||'');
   if(!/^\d{4}-\d{2}-\d{2}$/.test(s.startDate||'')) s.startDate=todayStr();
-  return {v:1,settings:s,
+  return {v:1,updatedAt:Number(o.updatedAt)||0,settings:s,
     nextPage:clamp(parseInt(o.nextPage)||s.startPage,1,MAXP+1),
     farPtr:clamp(parseInt(o.farPtr)||0,0,MAXP),
     newLog:Array.isArray(o.newLog)?o.newLog.filter(x=>x&&x.date&&Array.isArray(x.pages)):[],
     days:(o.days&&typeof o.days==='object')?o.days:{},
     notes:Array.isArray(o.notes)?o.notes:[]};
 }
+function hasData(s){
+  return Object.keys(s.days).length>0||s.newLog.length>0||s.notes.length>0||(s.settings.old||'')!=='1-1';
+}
 function load(){
-  try{const raw=localStorage.getItem(KEY);return normalizeState(raw?JSON.parse(raw):null);}
-  catch(e){return defaultState();}
+  try{
+    const raw=localStorage.getItem(KEY);
+    const s=normalizeState(raw?JSON.parse(raw):null);
+    /* بيانات قديمة قبل إضافة المزامنة: نختمها بوقت الآن حتى لا تُعدّ "فارغة" */
+    if(!s.updatedAt&&hasData(s)){
+      s.updatedAt=Date.now();
+      try{localStorage.setItem(KEY,JSON.stringify(s));}catch(e){}
+    }
+    return s;
+  }catch(e){return defaultState();}
 }
 let state=load();
-function save(){
+/* opts.keepStamp=true: حفظ محلي فقط بدون تغيير updatedAt ولا رفع (يُستخدم عند استلام نسخة من السحابة) */
+function save(opts){
+  opts=opts||{};
+  if(!opts.keepStamp) state.updatedAt=Date.now();
   try{localStorage.setItem(KEY,JSON.stringify(state));}
   catch(e){toast('تعذّر الحفظ في المتصفح');}
+  if(!opts.keepStamp&&window.CloudSync) window.CloudSync.schedulePush();
 }
 function resetAll(){state=defaultState();save();}
 
@@ -598,6 +642,7 @@ function renderAll(){
   if(typeof renderMap==='function') renderMap();
   if(typeof renderNotes==='function') renderNotes();
   if(typeof renderSettings==='function') renderSettings();
+  if(window.CloudSync) window.CloudSync.renderAccount();
 }
 function showView(v){
   $$('#tabs button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));

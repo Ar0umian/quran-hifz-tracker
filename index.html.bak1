@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>خطة حفظ ومراجعة القرآن الكريم</title>
+<style>
+:root{
+  --bg:#f6f3ea; --card:#ffffff; --ink:#26332b; --muted:#6b7a70;
+  --green:#2f6b4f; --green-d:#1f4d38; --green-l:#e3efe8;
+  --gold:#b8892b; --gold-l:#f7ecd0; --red:#b4493f; --red-l:#f8e3e0;
+  --blue:#3b6ea5; --blue-l:#e2ecf6; --line:#e2ddcc; --radius:14px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:"Noto Naskh Arabic","Geeza Pro","Segoe UI",Tahoma,sans-serif;font-size:17px;line-height:1.7}
+header{background:var(--green-d);color:#fff;padding:18px 16px 0;text-align:center}
+header h1{margin:0 0 4px;font-size:1.5rem}
+header .sub{opacity:.85;font-size:.9rem;margin-bottom:12px}
+nav{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;padding-bottom:0}
+nav button{background:transparent;border:0;color:#d7e8dd;font:inherit;padding:10px 16px;cursor:pointer;border-radius:10px 10px 0 0}
+nav button.active{background:var(--bg);color:var(--green-d);font-weight:700}
+main{max-width:980px;margin:0 auto;padding:18px 14px 80px}
+.view{display:none}
+.view.active{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.card h3{margin:0 0 8px;font-size:1.1rem;color:var(--green-d)}
+.card .row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px dashed var(--line)}
+.card .row:last-child{border-bottom:0}
+.card .label{color:var(--muted)}
+.card .val{font-weight:700;text-align:left}
+.tag{display:inline-block;padding:2px 10px;border-radius:999px;font-size:.8rem;background:var(--green-l);color:var(--green-d)}
+.tag.gold{background:var(--gold-l);color:#7a5a14}
+.tag.red{background:var(--red-l);color:var(--red)}
+.tag.blue{background:var(--blue-l);color:var(--blue)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px}
+.banner{padding:12px 16px;border-radius:var(--radius);margin-bottom:14px;background:var(--gold-l);color:#6b4d10}
+.banner.rest{background:var(--green-l);color:var(--green-d)}
+.banner.late{background:var(--red-l);color:var(--red)}
+.btn{font:inherit;border:0;border-radius:12px;padding:10px 20px;cursor:pointer;background:var(--green);color:#fff}
+.btn:hover{background:var(--green-d)}
+.btn.alt{background:var(--green-l);color:var(--green-d)}
+.btn.warn{background:var(--red-l);color:var(--red)}
+.btn.big{display:block;width:100%;font-size:1.25rem;padding:16px;font-weight:700;margin-top:6px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+/* التقويم */
+.cal-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.cal-head h3{margin:0}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.cal-dow{text-align:center;font-size:.8rem;color:var(--muted)}
+.cal-cell{min-height:64px;border:1px solid var(--line);border-radius:10px;background:#fff;padding:4px 6px;cursor:pointer;font-size:.85rem;display:flex;flex-direction:column;justify-content:space-between}
+.cal-cell .n{font-weight:700}
+.cal-cell .ic{text-align:left;font-size:1.05rem}
+.cal-cell.empty{background:transparent;border:0;cursor:default}
+.cal-cell.done{background:var(--green-l)}
+.cal-cell.today{outline:2px solid var(--green);background:#fffdf3}
+.cal-cell.future{background:#fff}
+.cal-cell.late{background:var(--red-l)}
+.cal-cell.fri{background:#eef5ee}
+.cal-cell.sat{background:var(--blue-l)}
+.cal-cell.sel{box-shadow:0 0 0 3px var(--gold)}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;font-size:.85rem;color:var(--muted)}
+/* خريطة المصحف */
+.map-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:4px;direction:rtl}
+.pg{height:32px;border-radius:6px;font-size:.7rem;display:flex;align-items:center;justify-content:center;background:#ece8d8;color:#6b6755}
+.pg.prep{background:var(--gold);color:#fff}
+.pg.near{background:var(--blue);color:#fff}
+.pg.far{background:var(--green);color:#fff}
+.pg.today{outline:2px solid var(--red)}
+.pg.old{background:#7fae96;color:#fff}
+/* نماذج */
+label{display:block;margin:10px 0 4px;color:var(--muted);font-size:.9rem}
+input,select,textarea{width:100%;font:inherit;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+textarea{min-height:80px;resize:vertical}
+.note-item{border-bottom:1px dashed var(--line);padding:8px 0;display:flex;justify-content:space-between;gap:10px}
+.note-item:last-child{border-bottom:0}
+.small{font-size:.85rem;color:var(--muted)}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--green-d);color:#fff;padding:10px 22px;border-radius:999px;opacity:0;pointer-events:none;transition:opacity .3s;z-index:9}
+#toast.show{opacity:1}
+@media(max-width:560px){.cal-cell{min-height:52px;font-size:.75rem}.card{padding:14px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>🕌 خطة حفظ ومراجعة القرآن الكريم</h1>
+  <div class="sub" id="todayHeader"></div>
+  <nav id="tabs">
+    <button data-view="today" class="active">اليوم</button>
+    <button data-view="calendar">التقويم</button>
+    <button data-view="map">خريطة المصحف</button>
+    <button data-view="notes">المتشابهات</button>
+    <button data-view="settings">الإعدادات</button>
+  </nav>
+</header>
+
+<main>
+  <!-- لوحة اليوم -->
+  <section id="view-today" class="view active">
+    <div id="todayBanner"></div>
+    <div id="todayCards" class="grid2"></div>
+    <div id="todayActions">
+      <button id="confirmBtn" class="btn big">✅ تأكيد إتمام مهام اليوم</button>
+      <div class="actions">
+        <button id="makeupBtn" class="btn alt">⏳ تعويض يوم فائت</button>
+      </div>
+      <p class="small" id="confirmHint"></p>
+    </div>
+  </section>
+
+  <!-- التقويم -->
+  <section id="view-calendar" class="view">
+    <div class="card">
+      <div class="cal-head">
+        <div class="actions" style="margin:0">
+          <button id="calPrev" class="btn alt">→ السابق</button>
+          <button id="calNext" class="btn alt">التالي ←</button>
+        </div>
+        <h3 id="calTitle"></h3>
+        <select id="calMode" style="width:auto">
+          <option value="month">شهري</option>
+          <option value="week">أسبوعي</option>
+        </select>
+      </div>
+      <div id="calGrid" class="cal-grid"></div>
+      <div class="legend">
+        <span>✅ منجز</span><span>📍 اليوم</span><span>📅 مجدول</span>
+        <span>⏳ مؤجّل</span><span>🌿 الجمعة إجازة</span><span>🔄 السبت مراجعة أسبوعية</span>
+      </div>
+    </div>
+    <div class="card" id="dayDetail"><span class="small">اضغطي على أي يوم لعرض تفاصيله.</span></div>
+  </section>
+
+  <!-- خريطة المصحف -->
+  <section id="view-map" class="view">
+    <div class="card">
+      <h3>خريطة المصحف (1 – 604)</h3>
+      <div id="mapStats" class="small" style="margin-bottom:10px"></div>
+      <div id="mapGrid" class="map-grid"></div>
+      <div class="legend">
+        <span><span class="tag gold">قيد التحضير</span></span>
+        <span><span class="tag blue">ماضٍ قريب</span></span>
+        <span><span class="tag">ماضٍ بعيد</span></span>
+        <span>الرمادي: غير محفوظ</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- المتشابهات -->
+  <section id="view-notes" class="view">
+    <div class="card">
+      <h3>سجل المتشابهات والتلكؤ</h3>
+      <label>رقم الصفحة أو الآية</label>
+      <input id="noteRef" placeholder="مثال: صفحة 45 / البقرة 255">
+      <label>الملاحظة</label>
+      <textarea id="noteText" placeholder="موضع التوقف أو المتشابه..."></textarea>
+      <div class="actions"><button id="noteSaveBtn" class="btn">إضافة</button></div>
+    </div>
+    <div class="card"><h3>الملاحظات المسجّلة</h3><div id="notesList"></div></div>
+  </section>
+
+  <!-- الإعدادات -->
+  <section id="view-settings" class="view">
+    <div class="card">
+      <h3>إعدادات الخطة</h3>
+      <label>صفحة بداية الحفظ الجديد</label>
+      <input id="setStart" type="number" min="1" max="604">
+      <label>عدد صفحات الحفظ اليومي</label>
+      <input id="setDaily" type="number" min="1" max="10">
+      <label>حصة مراجعة الماضي البعيد يومياً</label>
+      <select id="setFar">
+        <option value="10">10 صفحات</option>
+        <option value="20">20 صفحة</option>
+        <option value="40">40 صفحة</option>
+        <option value="60">60 صفحة</option>
+      </select>
+      <label>عدد صفحات الماضي القريب</label>
+      <input id="setNear" type="number" min="2" max="40">
+      <label>المحفوظ السابق (نطاقات مفصولة بفاصلة، مثال: 1-1, 582-604)</label>
+      <input id="setOld" placeholder="1-1">
+      <label>تاريخ بداية الخطة</label>
+      <input id="setStartDate" type="date">
+      <div class="actions"><button id="saveSettings" class="btn">حفظ الإعدادات</button></div>
+      <p class="small">تغيير الإعدادات يعيد حساب الأيام القادمة فقط، والأيام المنجزة تبقى كما هي.</p>
+    </div>
+    <div class="card">
+      <h3>النسخ الاحتياطي</h3>
+      <div class="actions">
+        <button id="exportBtn" class="btn alt">⬇️ تصدير JSON</button>
+        <label class="btn alt" style="margin:0;cursor:pointer">⬆️ استيراد JSON
+          <input id="importFile" type="file" accept="application/json" style="display:none">
+        </label>
+        <button id="resetBtn" class="btn warn">🗑️ مسح كل البيانات</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="toast"></div>
+
+<script>
+// ===== نهاية الجزء 1: سيُكمل الجزء 2 من هنا =====
+
+/* ===================== الجزء 2: محرك الحساب ===================== */
+'use strict';
+const KEY='quranPlanV1';
+const MAXP=604;
+const DAYS_AR=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+const MONTHS_AR=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+const JUZ_START=[1,22,42,62,82,102,122,142,162,182,202,222,242,262,282,302,322,342,362,382,402,422,442,462,482,502,522,542,562,582];
+
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const pad=n=>String(n).padStart(2,'0');
+const clamp=(n,a,b)=>Math.min(b,Math.max(a,n));
+
+/* ---------- التواريخ (توقيت محلي، الظهر لتفادي مشاكل التوقيت الصيفي) ---------- */
+const fmtDate=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const parseDate=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d,12,0,0);};
+const todayStr=()=>fmtDate(new Date());
+const addDays=(s,n)=>{const d=parseDate(s);d.setDate(d.getDate()+n);return fmtDate(d);};
+const dow=s=>parseDate(s).getDay();                 // 0=أحد ... 4=خميس، 5=جمعة، 6=سبت
+const kind=s=>{const w=dow(s);return w<=4?'work':(w===5?'fri':'sat');};
+const diffDays=(a,b)=>Math.round((parseDate(b)-parseDate(a))/86400000);
+const fmtAr=s=>{const d=parseDate(s);return DAYS_AR[d.getDay()]+' '+d.getDate()+' '+MONTHS_AR[d.getMonth()]+' '+d.getFullYear();};
+
+/* ---------- أدوات الصفحات والأجزاء ---------- */
+function fmtPages(arr){
+  if(!arr||!arr.length) return '—';
+  const a=[...arr].sort((x,y)=>x-y); const out=[]; let s=a[0],p=a[0];
+  for(let i=1;i<=a.length;i++){
+    if(a[i]===p+1){p=a[i];continue;}
+    out.push(s===p?String(s):s+'–'+p); s=a[i]; p=a[i];
+  }
+  return out.join('، ');
+}
+function juzOf(p){let j=1;for(let i=0;i<30;i++){if(JUZ_START[i]<=p)j=i+1;}return j;}
+function parseRanges(txt){
+  const s=new Set();
+  String(txt||'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+    .replace(/\s*[-–]\s*/g,'-').split(/[,،;\s]+/).forEach(part=>{
+      const m=part.match(/^(\d+)(?:-(\d+))?$/); if(!m) return;
+      let a=+m[1], b=m[2]?+m[2]:a; if(a>b)[a,b]=[b,a];
+      a=Math.max(1,a); b=Math.min(MAXP,b);
+      for(let p=a;p<=b;p++) s.add(p);
+    });
+  return [...s].sort((x,y)=>x-y);
+}
+function toast(m){
+  const t=$('#toast'); if(!t) return;
+  t.textContent=m; t.classList.add('show');
+  clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+/* ---------- الحالة والتخزين ---------- */
+function defaultState(){
+  return {v:1,
+    settings:{startPage:2,daily:2,far:10,near:10,old:'1-1',startDate:todayStr()},
+    nextPage:2,      // الصفحة التالية في مسار الحفظ الجديد
+    farPtr:0,        // آخر صفحة روجعت في الماضي البعيد (مؤشر دوّار بالرقم لا بالفهرس)
+    newLog:[],       // [{date,pages:[..]}] صفحات الحفظ الجديد بترتيب التأكيد
+    days:{},         // التاريخ -> سجل اليوم المنجز
+    notes:[]         // المتشابهات والتلكؤ
+  };
+}
+function normalizeState(o){
+  const d=defaultState(); if(!o||typeof o!=='object') return d;
+  const s=Object.assign({},d.settings,o.settings||{});
+  s.startPage=clamp(parseInt(s.startPage)||2,1,MAXP);
+  s.daily=clamp(parseInt(s.daily)||2,1,10);
+  s.far=clamp(parseInt(s.far)||10,1,MAXP);
+  s.near=clamp(parseInt(s.near)||10,1,60);
+  s.old=String(s.old||'');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(s.startDate||'')) s.startDate=todayStr();
+  return {v:1,settings:s,
+    nextPage:clamp(parseInt(o.nextPage)||s.startPage,1,MAXP+1),
+    farPtr:clamp(parseInt(o.farPtr)||0,0,MAXP),
+    newLog:Array.isArray(o.newLog)?o.newLog.filter(x=>x&&x.date&&Array.isArray(x.pages)):[],
+    days:(o.days&&typeof o.days==='object')?o.days:{},
+    notes:Array.isArray(o.notes)?o.notes:[]};
+}
+function load(){
+  try{const raw=localStorage.getItem(KEY);return normalizeState(raw?JSON.parse(raw):null);}
+  catch(e){return defaultState();}
+}
+let state=load();
+function save(){
+  try{localStorage.setItem(KEY,JSON.stringify(state));}
+  catch(e){toast('تعذّر الحفظ في المتصفح');}
+}
+function resetAll(){state=defaultState();save();}
+
+/* ---------- المحفوظ السابق ---------- */
+let _ok=null,_old=[],_oldSet=new Set();
+function getOld(){
+  const k=state.settings.old;
+  if(k!==_ok){_ok=k;_old=parseRanges(k);_oldSet=new Set(_old);}
+  return _old;
+}
+function oldSet(){getOld();return _oldSet;}
+
+/* ---------- لقطة الحالة (للمحاكاة دون تعديل الحالة الفعلية) ---------- */
+function snapFromState(){
+  return {nextPage:state.nextPage,farPtr:state.farPtr,
+    newLog:state.newLog.map(x=>({date:x.date,pages:x.pages.slice()}))};
+}
+const newListOf=S=>[...new Set(S.newLog.flatMap(x=>x.pages))];
+
+/* الحفظ الجديد: يأخذ count صفحة بدءاً من from ويتخطى ما هو محفوظ سابقاً */
+function takeNew(from,count){
+  const os=oldSet(); const out=[]; let p=from;
+  while(out.length<count&&p<=MAXP){if(!os.has(p)) out.push(p); p++;}
+  return out;
+}
+const after=(pages,from)=>pages.length?pages[pages.length-1]+1:from;
+
+/* الماضي البعيد: الحصة تلقائية = كل الرصيد حتى سقف 60، وبعده لوب دوّار */
+const FAR_CAP=60;
+function farQuota(total){return Math.min(total,FAR_CAP);}
+function farBatch(far,ptr,q){
+  const n=far.length; if(!n) return [];
+  if(n<=FAR_CAP) return far.slice();          // رصيد صغير: راجعي كله كل يوم بلا التفاف
+  q=Math.min(q,FAR_CAP,n);
+  let i=far.findIndex(p=>p>ptr); if(i<0) i=0; // أول صفحة بعد المؤشر، وإن انتهى الرصيد نرجع للبداية
+  const out=[]; for(let k=0;k<q;k++) out.push(far[(i+k)%n]);
+  return out;
+}
+function dailyJuz(date){
+  const n=diffDays(state.settings.startDate,date);
+  return (((n%30)+30)%30)+1;
+}
+function oldLast3(){
+  const old=getOld();
+  const juz=[...new Set(old.map(juzOf))].sort((a,b)=>a-b).slice(-3);
+  return {juz,pages:old.filter(p=>juz.includes(juzOf(p)))};
+}
+
+/* ---------- بناء مهام اليوم ---------- */
+function buildWorkTask(S,date){
+  const c=state.settings;
+  const nl=newListOf(S);
+  const nw=takeNew(S.nextPage,c.daily);                       // حفظ اليوم
+  const tm=takeNew(after(nw,S.nextPage),c.daily);             // ورد الغد
+  const rem=5-dow(date);                                      // أيام الأسبوع المتبقية شاملاً اليوم
+  const rest=takeNew(S.nextPage,c.daily*rem);
+  const week=takeNew(after(rest,S.nextPage),c.daily*5);       // حزمة الأسبوع القادم
+  const near=nl.slice(-c.near);                               // الماضي القريب (آخر N صفحة)
+  const nearSet=new Set(near);
+  const mem=[...new Set([...getOld(),...nl])].sort((a,b)=>a-b);
+  const far=mem.filter(p=>!nearSet.has(p));                   // البعيد = الكل ما عدا القريب (الخارج من القريب ينضم تلقائياً)
+  const quota=farQuota(far.length);
+  const farPages=farBatch(far,S.farPtr,quota);
+  return {kind:'work',date,new:nw,tomorrow:tm,week,near,far:farPages,farTotal:far.length,
+          farQuota:quota,farAll:far.length<=FAR_CAP,juz:dailyJuz(date)};
+}
+function buildSatTask(S,date){
+  const lo=addDays(date,-6),hi=addDays(date,-1);
+  const wk=[...new Set(S.newLog.filter(x=>x.date>=lo&&x.date<=hi).flatMap(x=>x.pages))].sort((a,b)=>a-b);
+  const o=oldLast3();
+  return {kind:'sat',date,weekNew:wk,old3:o.pages,old3juz:o.juz,juz:dailyJuz(date)};
+}
+function taskFor(S,date){
+  const k=kind(date);
+  if(k==='work') return buildWorkTask(S,date);
+  if(k==='sat') return buildSatTask(S,date);
+  return {kind:'fri',date};
+}
+function advance(S,t){
+  if(t.kind!=='work') return;
+  if(t.new.length){S.newLog.push({date:t.date,pages:t.new.slice()});S.nextPage=t.new[t.new.length-1]+1;}
+  if(t.far.length) S.farPtr=t.farAll?0:t.far[t.far.length-1]; // رصيد ≤60: المؤشر يعود للصفر ليبدأ اللوب من أول الرصيد
+}
+
+/* ---------- الترحيل والإسقاط على المستقبل ---------- */
+/* أول يوم لم تُحسم مهامه: اليوم إن لم يؤكَّد، وإلا الغد (ولا يسبق تاريخ بداية الخطة) */
+function pendingStart(){
+  const t=todayStr();
+  const d=(state.days[t]&&state.days[t].done)?addDays(t,1):t;
+  return d<state.settings.startDate?state.settings.startDate:d;
+}
+function nextWorkDate(){let d=pendingStart();while(kind(d)!=='work') d=addDays(d,1);return d;}
+/* مهام اليوم الفعلية: أول مهمة غير منجزة، فما فات يُدفع تلقائياً لليوم الحالي */
+function todayTask(){return taskFor(snapFromState(),todayStr());}
+/* مهام أيام الراحة (جمعة/سبت): حزمة الأسبوع القادم تبدأ من الصفحة التالية مباشرة */
+function restPrep(){return {week:takeNew(state.nextPage,state.settings.daily*5),next:buildWorkTask(snapFromState(),nextWorkDate())};}
+/* إسقاط المهام من أول يوم معلّق حتى until (يتقدم المؤشر والقريب والبعيد يوماً بيوم) */
+function project(until){
+  const out={}; const S=snapFromState(); let d=pendingStart(); let guard=0;
+  while(d<=until&&guard++<1500){const t=taskFor(S,d);out[d]=t;advance(S,t);d=addDays(d,1);}
+  return out;
+}
+function missedDays(){
+  const out=[],t=todayStr(); let d=state.settings.startDate,g=0;
+  while(d<t&&g++<1500){if(kind(d)==='work'&&!(state.days[d]&&state.days[d].done)) out.push(d);d=addDays(d,1);}
+  return out;
+}
+function dayInfo(date,proj){
+  const t0=todayStr(),k=kind(date),rec=state.days[date],isToday=date===t0; let status;
+  if(rec&&rec.done) status='done';
+  else if(date<state.settings.startDate) status='none';
+  else if(k==='fri') status='fri';
+  else if(k==='sat') status='sat';
+  else if(date<t0) status='late';
+  else if(isToday) status='today';
+  else status='future';
+  return {date,kind:k,status,isToday,rec,task:(proj&&proj[date])||null};
+}
+
+/* ---------- التأكيد والتراجع والتعويض ---------- */
+function confirmDay(date,opts){
+  opts=opts||{};
+  if(state.days[date]&&state.days[date].done) return false;
+  if(kind(date)==='fri') return false;
+  const S=snapFromState(); const t=taskFor(S,date);
+  const rec={done:true,kind:t.kind,makeup:!!opts.makeup,at:new Date().toISOString()};
+  if(t.kind==='work'){
+    Object.assign(rec,{new:t.new,near:t.near,far:t.far,prevNext:state.nextPage,prevFarPtr:state.farPtr});
+    advance(S,t);
+    state.nextPage=S.nextPage;state.farPtr=S.farPtr;state.newLog=S.newLog;
+  }else{rec.weekNew=t.weekNew;rec.old3=t.old3;}
+  state.days[date]=rec; save(); return true;
+}
+/* التعويض: يُنجَز عمل يوم إضافي الآن ويُسجَّل على أقدم يوم فائت */
+function makeupDay(){
+  const m=missedDays(); if(!m.length) return null;
+  return confirmDay(m[0],{makeup:true})?m[0]:null;
+}
+function undoLast(){
+  const ds=Object.keys(state.days).filter(d=>state.days[d]&&state.days[d].done);
+  if(!ds.length) return null;
+  ds.sort((a,b)=>state.days[a].at<state.days[b].at?-1:1);
+  const d=ds[ds.length-1],r=state.days[d];
+  if(r.kind==='work'&&typeof r.prevNext==='number'){
+    state.nextPage=r.prevNext;state.farPtr=r.prevFarPtr;
+    state.newLog=state.newLog.filter(x=>x.date!==d);
+  }
+  delete state.days[d]; save(); return d;
+}
+
+/* ---------- الإعدادات ---------- */
+function applySettings(inp){
+  const o=state.settings,n=Object.assign({},o);
+  n.startPage=clamp(parseInt(inp.startPage)||o.startPage,1,MAXP);
+  n.daily=clamp(parseInt(inp.daily)||o.daily,1,10);
+  n.far=clamp(parseInt(inp.far)||o.far,1,MAXP);
+  n.near=clamp(parseInt(inp.near)||o.near,1,60);
+  n.old=String(inp.old==null?o.old:inp.old).trim();
+  n.startDate=/^\d{4}-\d{2}-\d{2}$/.test(inp.startDate||'')?inp.startDate:o.startDate;
+  if(n.startPage!==o.startPage) state.nextPage=n.startPage;
+  state.settings=n; save(); return n;
+}
+
+/* ---------- خريطة المصحف ---------- */
+function mapData(){
+  const S=snapFromState(); const t=buildWorkTask(S,nextWorkDate());
+  const nl=newListOf(S); const nearSet=new Set(nl.slice(-state.settings.near));
+  const mem=new Set([...getOld(),...nl]);
+  const prep=new Set([...t.new,...t.tomorrow,...t.week]);
+  const cls=[];
+  for(let p=1;p<=MAXP;p++) cls[p]=nearSet.has(p)?'near':(mem.has(p)?'far':(prep.has(p)?'prep':''));
+  return {cls,todaySet:new Set(t.new),memorized:mem.size,near:nearSet.size,
+          newPath:nl.length,percent:Math.round(mem.size/MAXP*1000)/10};
+}
+
+/* ---------- اختبار ذاتي (اختياري من Console المتصفح: quranSelfTest()) ---------- */
+window.quranSelfTest=function(){
+  const r=[]; const eq=(n,a,b)=>{const ok=JSON.stringify(a)===JSON.stringify(b);r.push((ok?'✅ ':'❌ ')+n+(ok?'':' → '+JSON.stringify(a)));};
+  eq('التفاف المؤشر',farBatch([1,2,3,4,5],4,3),[5,1,2]);
+  eq('بلا تكرار',farBatch([1,2],1,10),[2,1]);
+  eq('تنسيق الصفحات',fmtPages([5,6,7,10]),'5–7، 10');
+  eq('22 نوفمبر 2026 أحد',dow('2026-11-22'),0);
+  eq('الخميس عمل','work',kind('2026-11-26'));
+  eq('الجمعة إجازة',kind('2026-11-27'),'fri');
+  eq('السبت مراجعة',kind('2026-11-28'),'sat');
+  eq('الجزء 30 يبدأ 582',juzOf(582),30);
+  console.log(r.join('\n')); return r;
+};
+
+/* ===================== الجزء 3: عرض لوحة اليوم ===================== */
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const cnt=a=>(a&&a.length?a.length:0)+' صفحة';
+
+function card(title,rows,extra){
+  return '<div class="card"><h3>'+title+'</h3>'+
+    rows.map(r=>'<div class="row"><span class="label">'+r[0]+'</span><span class="val">'+r[1]+'</span></div>').join('')+
+    (extra||'')+'</div>';
+}
+
+function renderToday(){
+  const t=todayStr(), k=kind(t), rec=state.days[t], done=!!(rec&&rec.done);
+  const before=t<state.settings.startDate;
+  $('#todayHeader').textContent=fmtAr(t);
+
+  /* ---------- اللافتة العلوية ---------- */
+  const missed=missedDays();
+  let banner='';
+  if(before){
+    banner='<div class="banner">🗓️ تبدأ الخطة يوم '+fmtAr(state.settings.startDate)+'</div>';
+  }else if(k==='fri'){
+    banner='<div class="banner rest">🌿 الجمعة إجازة وراحة تامة، لا حفظ ولا مراجعة اليوم.</div>';
+  }else if(done){
+    banner='<div class="banner rest">✅ تم إنجاز مهام اليوم، تقبّل الله منكِ.</div>';
+  }else if(k==='sat'){
+    banner='<div class="banner">🔄 السبت: مراجعة أسبوعية شاملة.</div>';
+  }else if(missed.length){
+    banner='<div class="banner late">⏳ فاتكِ '+missed.length+' يوم عمل، ودُفعت المهام غير المنجزة إلى اليوم تلقائياً. يمكنكِ أيضاً تعويض يوم فائت.</div>';
+  }else{
+    banner='<div class="banner">📍 مهام اليوم جاهزة، بالتوفيق إن شاء الله.</div>';
+  }
+  $('#todayBanner').innerHTML=banner;
+
+  /* ---------- مهام اليوم والتحضير ---------- */
+  const nd=nextWorkDate();
+  const nxt=buildWorkTask(snapFromState(),nd);
+  let cards='';
+  let tomorrow,week,juz=dailyJuz(t);
+
+  if(k==='work'&&!before){
+    let T;
+    if(done) T={new:rec.new||[],near:rec.near||[],far:rec.far||[],farTotal:null};
+    else T=todayTask();
+
+    cards+=card('📖 الحفظ الجديد',[
+      ['الصفحات',esc(fmtPages(T.new))],
+      ['العدد',cnt(T.new)],
+      ['الجزء',T.new.length?String(juzOf(T.new[0])):'—']
+    ], T.new.length?'':'<p class="small">لا توجد صفحات جديدة، أتممتِ المصحف أو بلغتِ الصفحة 604 🎉</p>');
+
+    if(done){
+      tomorrow=nxt.new;
+      week=(dow(nd)===0)?takeNew(state.nextPage,state.settings.daily*5):nxt.week;
+    }else{
+      tomorrow=T.tomorrow;
+      week=T.week;
+    }
+
+    cards+=card('🔁 المراجعة',[
+      ['الماضي القريب',esc(fmtPages(T.near))+' <span class="small">('+cnt(T.near)+')</span>'],
+      ['الماضي البعيد',esc(fmtPages(T.far))+' <span class="small">('+cnt(T.far)+')</span>']
+    ], T.farTotal!=null?'<p class="small">إجمالي الماضي البعيد: '+T.farTotal+' صفحة، والمؤشر يلتف تلقائياً عند النهاية.</p>':'');
+
+  }else if(k==='sat'&&!before){
+    const T=done?{weekNew:rec.weekNew||[],old3:rec.old3||[],old3juz:[]}:todayTask();
+    cards+=card('🔄 المراجعة الأسبوعية الشاملة',[
+      ['محفوظ هذا الأسبوع',esc(fmtPages(T.weekNew))+' <span class="small">('+cnt(T.weekNew)+')</span>'],
+      ['آخر 3 أجزاء من القديم',esc(fmtPages(T.old3))+' <span class="small">('+cnt(T.old3)+')</span>']
+    ], (T.old3juz&&T.old3juz.length)?'<p class="small">الأجزاء: '+T.old3juz.join('، ')+'</p>':'');
+
+    const notes=(state.notes||[]).slice().reverse();
+    if(notes.length){
+      cards+=card('📝 المتشابهات والتلكؤ',[],
+        notes.slice(0,12).map(n=>'<div class="note-item"><span><b>'+esc(n.ref)+'</b> — '+esc(n.text)+'</span></div>').join(''));
+    }else{
+      cards+=card('📝 المتشابهات والتلكؤ',[],'<p class="small">لا توجد ملاحظات مسجّلة بعد.</p>');
+    }
+    tomorrow=nxt.new;
+    week=takeNew(state.nextPage,state.settings.daily*5);
+
+  }else if(k==='fri'){
+    cards+=card('🌿 يوم راحة',[['المهام','لا شيء اليوم']],
+      '<p class="small">لا تُرحَّل إلى الجمعة أي مهام. استعدّي ليوم السبت للمراجعة الأسبوعية.</p>');
+    tomorrow=nxt.new;
+    week=takeNew(state.nextPage,state.settings.daily*5);
+  }
+
+  if(!before){
+    cards+=card('🌙 التحضير',[
+      ['ورد الغد (التحضير الليلي)',esc(fmtPages(tomorrow))],
+      ['الأسلوب','استماع 3 مرات + قراءة 5 مرات + هوامش وروابط'],
+      ['تحضير الأسبوع القادم',esc(fmtPages(week))+' <span class="small">('+cnt(week)+')</span>'],
+      ['الورد اليومي','قراءة الجزء '+juz]
+    ]);
+  }
+  $('#todayCards').innerHTML=cards;
+
+  /* ---------- الأزرار ---------- */
+  const cb=$('#confirmBtn'), mb=$('#makeupBtn'), ub=$('#undoBtn');
+  const anyDone=Object.keys(state.days).some(d=>state.days[d]&&state.days[d].done);
+  cb.style.display=(k==='fri')?'none':'block';
+  cb.disabled=done||before;
+  cb.textContent=done?'✅ تم التأكيد اليوم':(k==='sat'?'✅ تأكيد إتمام المراجعة الأسبوعية':'✅ تأكيد إتمام مهام اليوم');
+  mb.disabled=!missed.length;
+  mb.textContent=missed.length?('⏳ تعويض يوم فائت ('+missed.length+')'):'⏳ لا أيام فائتة';
+  ub.disabled=!anyDone;
+
+  let hint='';
+  if(before) hint='لم تبدأ الخطة بعد.';
+  else if(k==='fri') hint='استمتعي بيوم الراحة 🌿';
+  else if(done) hint='يمكنكِ التراجع عن آخر تأكيد إن ضغطتِ عليه بالخطأ.';
+  else hint='اضغطي التأكيد بعد إتمام كل المهام أعلاه. وإن لم تؤكّدي اليوم، تُدفع المهام غير المنجزة تلقائياً إلى يوم العمل التالي.';
+  $('#confirmHint').textContent=hint;
+}
+
+/* ---------- التبويبات والرسم الشامل ---------- */
+function renderAll(){
+  renderToday();
+  if(typeof renderCalendar==='function') renderCalendar();
+  if(typeof renderMap==='function') renderMap();
+  if(typeof renderNotes==='function') renderNotes();
+  if(typeof renderSettings==='function') renderSettings();
+}
+function showView(v){
+  $$('#tabs button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
+  $$('.view').forEach(s=>s.classList.toggle('active',s.id==='view-'+v));
+  renderAll();
+  window.scrollTo(0,0);
+}
+
+/* ---------- ربط أحداث لوحة اليوم ---------- */
+function bindToday(){
+  $$('#tabs button').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
+
+  /* زر التراجع (يُنشأ هنا ويُضاف بجانب زر التعويض) */
+  if(!$('#undoBtn')){
+    const u=document.createElement('button');
+    u.id='undoBtn'; u.className='btn warn'; u.textContent='↩️ تراجع عن آخر تأكيد';
+    $('#makeupBtn').parentNode.appendChild(u);
+  }
+
+  $('#confirmBtn').addEventListener('click',()=>{
+    const t=todayStr();
+    if(confirmDay(t)){toast('تم تأكيد مهام اليوم ✅');}
+    renderAll();
+  });
+  $('#makeupBtn').addEventListener('click',()=>{
+    const m=missedDays(); if(!m.length) return;
+    if(!confirm('سيُنجَز عمل يوم إضافي الآن ويُسجَّل على: '+fmtAr(m[0])+'\nهل أنتِ متأكدة؟')) return;
+    const d=makeupDay();
+    toast(d?('تم تعويض '+fmtAr(d)):'تعذّر التعويض');
+    renderAll();
+  });
+  $('#undoBtn').addEventListener('click',()=>{
+    if(!confirm('سيتم التراجع عن آخر تأكيد مسجّل، هل أنتِ متأكدة؟')) return;
+    const d=undoLast();
+    toast(d?('تم التراجع عن '+fmtAr(d)):'لا يوجد ما يُتراجع عنه');
+    renderAll();
+  });
+
+  /* تحديث تلقائي عند العودة للتبويب أو تغيّر اليوم */
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden) renderAll();});
+}
+
+/* ===================== الجزء 4: التقويم والخريطة والإعدادات ===================== */
+let calMode='month', calCursor=todayStr(), selDate=todayStr();
+const ICONS={done:'✅',today:'📍',future:'📅',late:'⏳',fri:'🌿',sat:'🔄',none:''};
+const STATUS_AR={done:'منجز',today:'اليوم',future:'مجدول',late:'مؤجّل',fri:'إجازة',sat:'مراجعة أسبوعية',none:'قبل بداية الخطة'};
+const shortAr=s=>{const d=parseDate(s);return d.getDate()+' '+MONTHS_AR[d.getMonth()];};
+const shiftMonth=(s,n)=>{const d=parseDate(s);d.setDate(1);d.setMonth(d.getMonth()+n);return fmtDate(d);};
+const rowsHtml=r=>r.map(x=>'<div class="row"><span class="label">'+x[0]+'</span><span class="val">'+x[1]+'</span></div>').join('');
+
+/* ---------- التقويم ---------- */
+function renderCalendar(){
+  const grid=$('#calGrid'); if(!grid) return;
+  $('#calMode').value=calMode;
+  let start,end,title;
+  if(calMode==='month'){
+    const d=parseDate(calCursor);
+    start=fmtDate(new Date(d.getFullYear(),d.getMonth(),1,12));
+    end=fmtDate(new Date(d.getFullYear(),d.getMonth()+1,0,12));
+    title=MONTHS_AR[d.getMonth()]+' '+d.getFullYear();
+  }else{
+    start=addDays(calCursor,-dow(calCursor)); end=addDays(start,6);
+    title='أسبوع '+shortAr(start)+' – '+shortAr(end)+' '+parseDate(end).getFullYear();
+  }
+  $('#calTitle').textContent=title;
+  const proj=project(end);
+  let html=DAYS_AR.map(n=>'<div class="cal-dow">'+n+'</div>').join('');
+  if(calMode==='month'){for(let i=0;i<dow(start);i++) html+='<div class="cal-cell empty"></div>';}
+  let d=start,g=0;
+  while(d<=end&&g++<40){
+    const info=dayInfo(d,proj);
+    const cls=['cal-cell',info.status==='none'?'future':info.status];
+    if(info.isToday&&info.status==='done') cls.push('today');
+    if(d===selDate) cls.push('sel');
+    html+='<div class="'+cls.join(' ')+'" data-date="'+d+'"><span class="n">'+parseDate(d).getDate()+'</span><span class="ic">'+ICONS[info.status]+'</span></div>';
+    d=addDays(d,1);
+  }
+  grid.innerHTML=html;
+  renderDayDetail();
+}
+
+function renderDayDetail(){
+  const box=$('#dayDetail'); if(!box||!selDate) return;
+  const info=dayInfo(selDate,null);
+  let html='<h3>'+fmtAr(selDate)+' <span class="tag '+(info.status==='late'?'red':(info.status==='sat'?'blue':(info.status==='fri'?'':'gold')))+'">'+STATUS_AR[info.status]+'</span></h3>';
+  const rec=info.rec;
+  if(rec&&rec.done){
+    if(rec.kind==='work'){
+      html+=rowsHtml([
+        ['الحفظ الجديد',esc(fmtPages(rec.new))],
+        ['الماضي القريب',esc(fmtPages(rec.near))],
+        ['الماضي البعيد',esc(fmtPages(rec.far))]
+      ]);
+    }else{
+      html+=rowsHtml([
+        ['محفوظ الأسبوع',esc(fmtPages(rec.weekNew))],
+        ['آخر 3 أجزاء من القديم',esc(fmtPages(rec.old3))]
+      ]);
+    }
+    if(rec.makeup) html+='<p class="small">سُجّل هذا اليوم بالتعويض.</p>';
+  }else if(info.status==='none'){
+    html+='<p class="small">هذا اليوم قبل بداية الخطة.</p>';
+  }else if(info.kind==='fri'){
+    html+='<p class="small">إجازة رسمية وراحة تامة، لا حفظ ولا مراجعة ولا ترحيل مهام إليها.</p>';
+  }else if(info.status==='late'){
+    html+='<p class="small">لم يُؤكَّد هذا اليوم، فدُفعت مهامه تلقائياً إلى أول يوم عمل قادم. يمكنكِ تعويضه من لوحة اليوم.</p>';
+  }else{
+    const t=project(selDate)[selDate];
+    if(!t){html+='<p class="small">لا تتوفر تفاصيل لهذا اليوم.</p>';}
+    else if(t.kind==='work'){
+      html+=rowsHtml([
+        ['الحفظ الجديد',esc(fmtPages(t.new))],
+        ['ورد الغد (تحضير)',esc(fmtPages(t.tomorrow))],
+        ['تحضير الأسبوع القادم',esc(fmtPages(t.week))],
+        ['الماضي القريب',esc(fmtPages(t.near))],
+        ['الماضي البعيد',esc(fmtPages(t.far))],
+        ['الورد اليومي','قراءة الجزء '+t.juz]
+      ]);
+      html+='<p class="small">المهام المستقبلية متوقعة بناءً على إنجازكِ الحالي، وقد تتغير إن تأخرتِ.</p>';
+    }else if(t.kind==='sat'){
+      html+=rowsHtml([
+        ['محفوظ الأسبوع (متوقع)',esc(fmtPages(t.weekNew))],
+        ['آخر 3 أجزاء من القديم',esc(fmtPages(t.old3))]
+      ]);
+    }
+  }
+  box.innerHTML=html;
+}
+
+/* ---------- خريطة المصحف ---------- */
+function renderMap(){
+  const g=$('#mapGrid'); if(!g) return;
+  const m=mapData();
+  let html='';
+  for(let p=1;p<=MAXP;p++){
+    const c=[ 'pg' ]; if(m.cls[p]) c.push(m.cls[p]); if(m.todaySet.has(p)) c.push('today');
+    html+='<div class="'+c.join(' ')+'" data-p="'+p+'">'+p+'</div>';
+  }
+  g.innerHTML=html;
+  $('#mapStats').textContent='المحفوظ: '+m.memorized+' من 604 صفحة ('+m.percent+'%) — منها '+m.newPath+' صفحة في المسار الجديد — الماضي القريب: '+m.near+' صفحة. الإطار الأحمر = حفظ اليوم.';
+}
+
+/* ---------- المتشابهات ---------- */
+function renderNotes(){
+  const box=$('#notesList'); if(!box) return;
+  if(!state.notes.length){box.innerHTML='<p class="small">لا توجد ملاحظات بعد.</p>';return;}
+  box.innerHTML=state.notes.map((n,i)=>({n,i})).reverse().map(x=>
+    '<div class="note-item"><span><b>'+esc(x.n.ref)+'</b> — '+esc(x.n.text)+'</span>'+
+    '<button class="btn warn" data-del="'+x.i+'" style="padding:2px 12px">حذف</button></div>').join('');
+}
+
+/* ---------- الإعدادات ---------- */
+function renderSettings(){
+  const box=$('#view-settings'); if(!box) return;
+  /* الحصة التلقائية للماضي البعيد (قراءة فقط) */
+  const sel=$('#setFar');
+  if(sel){
+    sel.style.display='none';
+    if(sel.previousElementSibling) sel.previousElementSibling.style.display='none';
+    let info=$('#farAuto');
+    if(!info){
+      info=document.createElement('div'); info.id='farAuto'; info.className='banner';
+      sel.parentNode.insertBefore(info,sel);
+    }
+    const t=buildWorkTask(snapFromState(),nextWorkDate());
+    info.innerHTML='<b>مراجعة الماضي البعيد (تلقائية)</b><br>'+
+      'الرصيد الحالي: '+t.farTotal+' صفحة — حصة اليوم: <b>'+t.farQuota+' صفحة</b><br>'+
+      '<span class="small">'+(t.farAll
+        ?'الرصيد أقل من أو يساوي 60، فتُراجعين كامل الرصيد يومياً، وتتصاعد الحصة مع خروج صفحتين جديدتين من الماضي القريب كل يوم حفظ حتى سقف 60 صفحة.'
+        :'تجاوز الرصيد 60 صفحة، فالحصة ثابتة على 60 صفحة ويدور المؤشر في لوب مع التفاف تلقائي إلى بداية الرصيد عند نهايته، ويُحفظ موضعه لليوم التالي.')+'</span>';
+  }
+  if(box.contains(document.activeElement)&&document.activeElement.tagName!=='BUTTON') return;
+  const s=state.settings;
+  $('#setStart').value=s.startPage; $('#setDaily').value=s.daily;
+  $('#setNear').value=s.near; $('#setOld').value=s.old; $('#setStartDate').value=s.startDate;
+}
+
+/* ---------- التصدير والاستيراد ---------- */
+function exportJSON(){
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download='quran-plan-backup-'+todayStr()+'.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  toast('تم تصدير النسخة الاحتياطية');
+}
+function importJSON(file){
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const o=JSON.parse(r.result);
+      if(!o||typeof o!=='object'||!o.settings||!Array.isArray(o.newLog)) throw new Error('bad');
+      if(!confirm('سيتم استبدال بياناتكِ الحالية بالنسخة المستوردة، هل أنتِ متأكدة؟')) return;
+      state=normalizeState(o); save(); renderAll(); toast('تم استيراد النسخة بنجاح ✅');
+    }catch(e){toast('الملف غير صالح');}
+  };
+  r.readAsText(file);
+}
+
+/* ---------- الربط والتشغيل ---------- */
+function bindRest(){
+  $('#calPrev').addEventListener('click',()=>{calCursor=calMode==='month'?shiftMonth(calCursor,-1):addDays(calCursor,-7);renderCalendar();});
+  $('#calNext').addEventListener('click',()=>{calCursor=calMode==='month'?shiftMonth(calCursor,1):addDays(calCursor,7);renderCalendar();});
+  $('#calMode').addEventListener('change',e=>{calMode=e.target.value;renderCalendar();});
+  $('#calGrid').addEventListener('click',e=>{
+    const c=e.target.closest('.cal-cell[data-date]'); if(!c) return;
+    selDate=c.dataset.date; renderCalendar();
+  });
+  $('#mapGrid').addEventListener('click',e=>{
+    const c=e.target.closest('.pg'); if(!c) return;
+    const p=+c.dataset.p; toast('صفحة '+p+' — الجزء '+juzOf(p));
+  });
+  $('#noteSaveBtn').addEventListener('click',()=>{
+    const ref=$('#noteRef').value.trim(), text=$('#noteText').value.trim();
+    if(!ref&&!text){toast('اكتبي رقم الصفحة أو الملاحظة');return;}
+    state.notes.push({ref:ref||'—',text:text,at:new Date().toISOString()});
+    save(); $('#noteRef').value=''; $('#noteText').value=''; renderNotes(); renderToday(); toast('تمت إضافة الملاحظة');
+  });
+  $('#notesList').addEventListener('click',e=>{
+    const b=e.target.closest('[data-del]'); if(!b) return;
+    state.notes.splice(+b.dataset.del,1); save(); renderNotes(); renderToday();
+  });
+  $('#saveSettings').addEventListener('click',()=>{
+    applySettings({startPage:$('#setStart').value,daily:$('#setDaily').value,far:$('#setFar').value,
+      near:$('#setNear').value,old:$('#setOld').value,startDate:$('#setStartDate').value});
+    document.activeElement&&document.activeElement.blur();
+    renderAll(); toast('تم حفظ الإعدادات ✅');
+  });
+  $('#exportBtn').addEventListener('click',exportJSON);
+  $('#importFile').addEventListener('change',e=>{
+    const f=e.target.files[0]; if(f) importJSON(f); e.target.value='';
+  });
+  $('#resetBtn').addEventListener('click',()=>{
+    if(!confirm('سيتم مسح كل البيانات نهائياً. يُنصح بتصدير نسخة احتياطية أولاً. متابعة؟')) return;
+    resetAll(); renderAll(); toast('تم مسح البيانات');
+  });
+}
+
+function init(){
+  bindToday();
+  bindRest();
+  renderAll();
+  let last=todayStr();
+  setInterval(()=>{const n=todayStr();if(n!==last){last=n;calCursor=n;selDate=n;renderAll();}},60000);
+}
+init();
+</script>
+</body>
+</html>
