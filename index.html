@@ -219,13 +219,7 @@ textarea{min-height:80px;resize:vertical}
    مكان لصق firebaseConfig الخاص بتطبيق الويب
    (أو استخدمي أمر الخطوة الثالثة ليلصقه عنكِ)
    =================================================== */
-window.FIREBASE_CONFIG = {
-  apiKey: "الصقي_apiKey_هنا",
-  authDomain: "quran-plan-d3bbc.firebaseapp.com",
-  projectId: "quran-plan-d3bbc",
-  messagingSenderId: "756687017037",
-  appId: "الصقي_appId_هنا"
-};
+window.FIREBASE_CONFIG = {[\s\S]*?\})', clip) or re.search(r'(\{[\s\S]*?apiKey[\s\S]*?\};
 </script>
 <script>
 // ===== نهاية الجزء 1: سيُكمل الجزء 2 من هنا =====
