@@ -634,13 +634,17 @@ function renderToday(){
   if(!before){
     const prepLabel=(k==='sat')?'تحضير يوم الأحد':'ورد الغد (التحضير الليلي)';
     const juzText=(k==='fri'||k==='sat')?('قراءة واستماع الجزء '+juz):('قراءة الجزء '+juz);
-    cards+=card('🌙 التحضير',[
+    const prepRows=[
       [prepLabel,esc(fmtPages(tomorrow))],
-      ['الأسلوب','استماع 3 مرات + قراءة 5 مرات + هوامش وروابط'],
-      ['تحضير قادم (8 أيام عمل بعد الغد)',esc(fmtPages(week))+' <span class="small">('+cnt(week)+')</span>'],
-      ['الورد اليومي',juzText]
-    ]);
+      ['الأسلوب','استماع 3 مرات + قراءة 5 مرات + هوامش وروابط']
+    ];
+    if(k!=='sat'){
+      prepRows.push(['تحضير قادم (8 أيام عمل بعد الغد)',esc(fmtPages(week))+' <span class="small">('+cnt(week)+')</span>']);
+    }
+    prepRows.push(['الورد اليومي',juzText]);
+    cards+=card('🌙 التحضير',prepRows);
   }
+  
   $('#todayCards').innerHTML=cards;
 
   /* ---------- الأزرار ---------- */
@@ -794,7 +798,6 @@ function renderDayDetail(){
         ['مراجعة محفوظ هذا الأسبوع',esc(fmtPages(t.weekNew))],
         ['الماضي القديم (حتى 100 صفحة)',esc(fmtPages(t.satOld))],
         ['تحضير يوم الأحد',esc(fmtPages(t.sundayPrep))],
-        ['تحضير قادم (8 أيام عمل بعد الغد)',esc(fmtPages(t.week))],
         ['الورد اليومي','قراءة واستماع الجزء '+t.juz]
       ]);
     }
