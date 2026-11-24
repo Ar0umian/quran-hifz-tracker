@@ -389,20 +389,20 @@ function oldLast3(){
 function buildWorkTask(S,date){
   const c=state.settings;
   const nl=newListOf(S);
-  const nw=takeNew(S.nextPage,c.daily);                       // حفظ اليوم
-  const tm=takeNew(after(nw,S.nextPage),c.daily);             // ورد الغد
-  const rem=5-dow(date);                                      // أيام الأسبوع المتبقية شاملاً اليوم
-  const rest=takeNew(S.nextPage,c.daily*rem);
-  const week=takeNew(after(rest,S.nextPage),c.daily*5);       // حزمة الأسبوع القادم
-  const near=nl.slice(-c.near);                               // الماضي القريب (آخر N صفحة)
+  const nw=takeNew(S.nextPage,c.daily);                         // حفظ اليوم
+  const tm=takeNew(after(nw,S.nextPage),c.daily);               // ورد الغد (ليلة بليلة)
+  const afterTomorrow=after(tm,after(nw,S.nextPage));
+  const week=takeNew(afterTomorrow,c.daily*8);                  // نافذة متحركة: 8 أيام عمل بعد الغد
+  const near=nl.slice(-c.near);                                 // الماضي القريب (آخر N صفحة)
   const nearSet=new Set(near);
   const mem=[...new Set([...getOld(),...nl])].sort((a,b)=>a-b);
-  const far=mem.filter(p=>!nearSet.has(p));                   // البعيد = الكل ما عدا القريب (الخارج من القريب ينضم تلقائياً)
+  const far=mem.filter(p=>!nearSet.has(p));
   const quota=farQuota(far.length);
   const farPages=farBatch(far,S.farPtr,quota);
   return {kind:'work',date,new:nw,tomorrow:tm,week,near,far:farPages,farTotal:far.length,
           farQuota:quota,farAll:far.length<=FAR_CAP,juz:dailyJuz(date)};
 }
+
 function buildSatTask(S,date){
   const lo=addDays(date,-6),hi=addDays(date,-1);
   const wk=[...new Set(S.newLog.filter(x=>x.date>=lo&&x.date<=hi).flatMap(x=>x.pages))].sort((a,b)=>a-b);
@@ -559,7 +559,7 @@ function renderToday(){
   }
   $('#todayBanner').innerHTML=banner;
 
-  /* ---------- مهام اليوم والتحضير ---------- */
+/* ---------- مهام اليوم والتحضير ---------- */
   const nd=nextWorkDate();
   const nxt=buildWorkTask(snapFromState(),nd);
   let cards='';
@@ -578,7 +578,7 @@ function renderToday(){
 
     if(done){
       tomorrow=nxt.new;
-      week=(dow(nd)===0)?takeNew(state.nextPage,state.settings.daily*5):nxt.week;
+      week=nxt.week;
     }else{
       tomorrow=T.tomorrow;
       week=T.week;
@@ -604,23 +604,24 @@ function renderToday(){
       cards+=card('📝 المتشابهات والتلكؤ',[],'<p class="small">لا توجد ملاحظات مسجّلة بعد.</p>');
     }
     tomorrow=nxt.new;
-    week=takeNew(state.nextPage,state.settings.daily*5);
+    week=nxt.week;
 
   }else if(k==='fri'){
     cards+=card('🌿 يوم راحة',[['المهام','لا شيء اليوم']],
       '<p class="small">لا تُرحَّل إلى الجمعة أي مهام. استعدّي ليوم السبت للمراجعة الأسبوعية.</p>');
     tomorrow=nxt.new;
-    week=takeNew(state.nextPage,state.settings.daily*5);
+    week=nxt.week;
   }
 
   if(!before){
     cards+=card('🌙 التحضير',[
       ['ورد الغد (التحضير الليلي)',esc(fmtPages(tomorrow))],
       ['الأسلوب','استماع 3 مرات + قراءة 5 مرات + هوامش وروابط'],
-      ['تحضير الأسبوع القادم',esc(fmtPages(week))+' <span class="small">('+cnt(week)+')</span>'],
+      ['تحضير قادم (8 أيام عمل بعد الغد)',esc(fmtPages(week))+' <span class="small">('+cnt(week)+')</span>'],
       ['الورد اليومي','قراءة الجزء '+juz]
     ]);
   }
+  
   $('#todayCards').innerHTML=cards;
 
   /* ---------- الأزرار ---------- */
@@ -762,7 +763,7 @@ function renderDayDetail(){
       html+=rowsHtml([
         ['الحفظ الجديد',esc(fmtPages(t.new))],
         ['ورد الغد (تحضير)',esc(fmtPages(t.tomorrow))],
-        ['تحضير الأسبوع القادم',esc(fmtPages(t.week))],
+        ['تحضير قادم (8 أيام عمل بعد الغد)',esc(fmtPages(t.week))],
         ['الماضي القريب',esc(fmtPages(t.near))],
         ['الماضي البعيد',esc(fmtPages(t.far))],
         ['الورد اليومي','قراءة الجزء '+t.juz]
