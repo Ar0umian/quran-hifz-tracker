@@ -415,8 +415,9 @@ function buildSatTask(S,date){
   const pool=mem.filter(p=>!wkSet.has(p)); // يستثنى محفوظ هذا الأسبوع فقط
   const satOld=farBatch(pool,S.farPtr,SAT_CAP); // يعطيكِ الموجود إن كان أقل من 100، ويقفل 100 عند توفرها
   const nd=nextWorkDate();
-  const sundayPrep=buildWorkTask(S,nd).new;
-  return {kind:'sat',date,weekNew:wk,satOld,satTotal:pool.length,sundayPrep,juz:dailyJuz(date)};
+  const nxt=buildWorkTask(S,nd);
+  const sundayPrep=nxt.new;
+  return {kind:'sat',date,weekNew:wk,satOld,satTotal:pool.length,sundayPrep,week:nxt.week,juz:dailyJuz(date)};
 }
 
 function taskFor(S,date){
@@ -787,10 +788,14 @@ function renderDayDetail(){
         ['الورد اليومي','قراءة الجزء '+t.juz]
       ]);
       html+='<p class="small">المهام المستقبلية متوقعة بناءً على إنجازكِ الحالي، وقد تتغير إن تأخرتِ.</p>';
+
     }else if(t.kind==='sat'){
       html+=rowsHtml([
-        ['محفوظ الأسبوع (متوقع)',esc(fmtPages(t.weekNew))],
-        ['آخر 3 أجزاء من القديم',esc(fmtPages(t.old3))]
+        ['مراجعة محفوظ هذا الأسبوع',esc(fmtPages(t.weekNew))],
+        ['الماضي القديم (حتى 100 صفحة)',esc(fmtPages(t.satOld))],
+        ['تحضير يوم الأحد',esc(fmtPages(t.sundayPrep))],
+        ['تحضير قادم (8 أيام عمل بعد الغد)',esc(fmtPages(t.week))],
+        ['الورد اليومي','قراءة واستماع الجزء '+t.juz]
       ]);
     }
   }
