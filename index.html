@@ -403,12 +403,22 @@ function buildWorkTask(S,date){
           farQuota:quota,farAll:far.length<=FAR_CAP,juz:dailyJuz(date)};
 }
 
+const SAT_CAP=100;
+
 function buildSatTask(S,date){
+  const c=state.settings;
   const lo=addDays(date,-6),hi=addDays(date,-1);
   const wk=[...new Set(S.newLog.filter(x=>x.date>=lo&&x.date<=hi).flatMap(x=>x.pages))].sort((a,b)=>a-b);
-  const o=oldLast3();
-  return {kind:'sat',date,weekNew:wk,old3:o.pages,old3juz:o.juz,juz:dailyJuz(date)};
+  const wkSet=new Set(wk);
+  const nl=newListOf(S);
+  const mem=[...new Set([...getOld(),...nl])].sort((a,b)=>a-b);
+  const pool=mem.filter(p=>!wkSet.has(p)); // يستثنى محفوظ هذا الأسبوع فقط
+  const satOld=farBatch(pool,S.farPtr,SAT_CAP); // يعطيكِ الموجود إن كان أقل من 100، ويقفل 100 عند توفرها
+  const nd=nextWorkDate();
+  const sundayPrep=buildWorkTask(S,nd).new;
+  return {kind:'sat',date,weekNew:wk,satOld,satTotal:pool.length,sundayPrep,juz:dailyJuz(date)};
 }
+
 function taskFor(S,date){
   const k=kind(date);
   if(k==='work') return buildWorkTask(S,date);
@@ -467,7 +477,7 @@ function confirmDay(date,opts){
     Object.assign(rec,{new:t.new,near:t.near,far:t.far,prevNext:state.nextPage,prevFarPtr:state.farPtr});
     advance(S,t);
     state.nextPage=S.nextPage;state.farPtr=S.farPtr;state.newLog=S.newLog;
-  }else{rec.weekNew=t.weekNew;rec.old3=t.old3;}
+  }else{rec.weekNew=t.weekNew;rec.satOld=t.satOld;}
   state.days[date]=rec; save(); return true;
 }
 /* التعويض: يُنجَز عمل يوم إضافي الآن ويُسجَّل على أقدم يوم فائت */
@@ -589,12 +599,16 @@ function renderToday(){
       ['الماضي البعيد',esc(fmtPages(T.far))+' <span class="small">('+cnt(T.far)+')</span>']
     ], T.farTotal!=null?'<p class="small">إجمالي الماضي البعيد: '+T.farTotal+' صفحة، والمؤشر يلتف تلقائياً عند النهاية.</p>':'');
 
-  }else if(k==='sat'&&!before){
-    const T=done?{weekNew:rec.weekNew||[],old3:rec.old3||[],old3juz:[]}:todayTask();
+
+}else if(k==='sat'&&!before){
+    const T=done
+      ?{weekNew:rec.weekNew||[],satOld:rec.satOld||[],satTotal:null,sundayPrep:nxt.new,juz:dailyJuz(t)}
+      :todayTask();
+
     cards+=card('🔄 المراجعة الأسبوعية الشاملة',[
-      ['محفوظ هذا الأسبوع',esc(fmtPages(T.weekNew))+' <span class="small">('+cnt(T.weekNew)+')</span>'],
-      ['آخر 3 أجزاء من القديم',esc(fmtPages(T.old3))+' <span class="small">('+cnt(T.old3)+')</span>']
-    ], (T.old3juz&&T.old3juz.length)?'<p class="small">الأجزاء: '+T.old3juz.join('، ')+'</p>':'');
+      ['مراجعة محفوظ هذا الأسبوع',esc(fmtPages(T.weekNew))+' <span class="small">('+cnt(T.weekNew)+')</span>'],
+      ['الماضي القديم (حتى 100 صفحة)',esc(fmtPages(T.satOld))+' <span class="small">('+cnt(T.satOld)+')</span>']
+    ], T.satTotal!=null?'<p class="small">المتاح خارج محفوظ الأسبوع: '+T.satTotal+' صفحة (يُعرض الموجود حتى إتمام 100 صفحة).</p>':'');
 
     const notes=(state.notes||[]).slice().reverse();
     if(notes.length){
@@ -603,25 +617,29 @@ function renderToday(){
     }else{
       cards+=card('📝 المتشابهات والتلكؤ',[],'<p class="small">لا توجد ملاحظات مسجّلة بعد.</p>');
     }
-    tomorrow=nxt.new;
+    tomorrow=T.sundayPrep||nxt.new;
     week=nxt.week;
 
   }else if(k==='fri'){
     cards+=card('🌿 يوم راحة',[['المهام','لا شيء اليوم']],
-      '<p class="small">لا تُرحَّل إلى الجمعة أي مهام. استعدّي ليوم السبت للمراجعة الأسبوعية.</p>');
+      '<p class="small">إجازة من الحفظ والمراجعة، والورد اليومي (قراءة واستماع) مستمر.</p>');
+    cards+=card('📖 الورد اليومي (قراءة واستماع)',[
+      ['الورد اليومي','قراءة واستماع الجزء '+juz]
+    ]);
     tomorrow=nxt.new;
     week=nxt.week;
   }
 
   if(!before){
+    const prepLabel=(k==='sat')?'تحضير يوم الأحد':'ورد الغد (التحضير الليلي)';
+    const juzText=(k==='fri'||k==='sat')?('قراءة واستماع الجزء '+juz):('قراءة الجزء '+juz);
     cards+=card('🌙 التحضير',[
-      ['ورد الغد (التحضير الليلي)',esc(fmtPages(tomorrow))],
+      [prepLabel,esc(fmtPages(tomorrow))],
       ['الأسلوب','استماع 3 مرات + قراءة 5 مرات + هوامش وروابط'],
       ['تحضير قادم (8 أيام عمل بعد الغد)',esc(fmtPages(week))+' <span class="small">('+cnt(week)+')</span>'],
-      ['الورد اليومي','قراءة الجزء '+juz]
+      ['الورد اليومي',juzText]
     ]);
   }
-  
   $('#todayCards').innerHTML=cards;
 
   /* ---------- الأزرار ---------- */
