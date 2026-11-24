@@ -195,6 +195,8 @@ textarea{min-height:80px;resize:vertical}
       <div class="actions"><button id="saveSettings" class="btn">حفظ الإعدادات</button></div>
       <p class="small">تغيير الإعدادات يعيد حساب الأيام القادمة فقط، والأيام المنجزة تبقى كما هي.</p>
     </div>
+    <div class="card" id="accountCard"></div>
+
     <div class="card">
       <h3>النسخ الاحتياطي</h3>
       <div class="actions">
@@ -883,6 +885,304 @@ function init(){
   setInterval(()=>{const n=todayStr();if(n!==last){last=n;calCursor=n;selDate=n;renderAll();}},60000);
 }
 init();
+</script>
+<script>
+/* FIREBASE_SYNC_MODULE: الحساب والمزامنة السحابية */
+(function(){
+'use strict';
+const OWNER_KEY='quranPlanOwner', SYNC_KEY='quranPlanLastSync';
+const cfg=window.FIREBASE_CONFIG||{};
+let configured=(typeof firebase!=='undefined')&&!!cfg.apiKey&&!!cfg.appId&&cfg.apiKey.indexOf('الصقي')<0&&cfg.appId.indexOf('الصقي')<0;
+let auth=null,db=null,user=null,ready=false;
+let timer=null,inflight=null,deleting=false,busy=false,status='idle',errMsg='';
+
+const lsGet=k=>{try{return localStorage.getItem(k);}catch(e){return null;}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,v);}catch(e){}};
+const lsDel=k=>{try{localStorage.removeItem(k);}catch(e){}};
+
+/* ---------- رسائل الأخطاء بالعربية ---------- */
+function errAr(e){
+  const m={
+    'auth/invalid-email':'البريد الإلكتروني غير صالح',
+    'auth/missing-password':'أدخلي كلمة المرور',
+    'auth/weak-password':'كلمة المرور ضعيفة (6 أحرف على الأقل)',
+    'auth/email-already-in-use':'هذا البريد مسجّل مسبقاً، جرّبي الدخول',
+    'auth/invalid-credential':'البريد أو كلمة المرور غير صحيحة',
+    'auth/wrong-password':'البريد أو كلمة المرور غير صحيحة',
+    'auth/user-not-found':'البريد أو كلمة المرور غير صحيحة',
+    'auth/too-many-requests':'محاولات كثيرة، حاولي لاحقاً',
+    'auth/network-request-failed':'تعذّر الاتصال بالإنترنت',
+    'auth/unauthorized-domain':'النطاق غير مضاف في Authorized domains',
+    'auth/operation-not-allowed':'طريقة الدخول غير مفعّلة في Firebase',
+    'auth/popup-closed-by-user':'أُغلقت نافذة الدخول',
+    'auth/cancelled-popup-request':'أُغلقت نافذة الدخول',
+    'auth/popup-blocked':'المتصفح منع النافذة المنبثقة، اسمحي بها وأعيدي المحاولة',
+    'permission-denied':'قواعد الأمان رفضت العملية، تأكدي من نشر Rules',
+    'unavailable':'تعذّر الاتصال بالسحابة، تحققي من الإنترنت'
+  };
+  return (e&&m[e.code])||('حدث خطأ: '+((e&&(e.code||e.message))||'غير معروف'));
+}
+
+/* ---------- النوافذ المنبثقة ---------- */
+let modalEl=null;
+function closeModal(){if(modalEl){modalEl.remove();modalEl=null;}}
+function openModal(inner,danger){
+  closeModal();
+  modalEl=document.createElement('div'); modalEl.className='modal-bg';
+  modalEl.innerHTML='<div class="modal'+(danger?' danger':'')+'">'+inner+'</div>';
+  document.body.appendChild(modalEl);
+  return modalEl;
+}
+const q=s=>modalEl?modalEl.querySelector(s):null;
+function msg(t,ok){const x=q('#accMsg'); if(x){x.textContent=t||''; x.style.color=ok?'#2f6b4f':'';}}
+function lock(on){if(modalEl) modalEl.querySelectorAll('button').forEach(b=>b.disabled=on);}
+async function run(fn){msg(''); lock(true); try{await fn();}catch(e){msg(errAr(e));} lock(false);}
+
+/* ---------- بطاقة الحساب في الإعدادات ---------- */
+function setStatus(s,m){status=s; errMsg=m||''; renderAccount();}
+function lastSyncText(){
+  const t=Number(lsGet(SYNC_KEY));
+  return t?new Date(t).toLocaleString('ar-SA-u-ca-gregory',{dateStyle:'medium',timeStyle:'short'}):'لم تتم بعد';
+}
+function statusText(){
+  if(deleting) return '🗑️ جارٍ حذف الحساب...';
+  if(status==='syncing') return '🔄 جارٍ المزامنة...';
+  if(status==='pending') return '⏳ تغييرات بانتظار الرفع';
+  if(status==='error') return '⚠️ '+errMsg;
+  return '✅ البيانات محدّثة';
+}
+function renderAccount(){
+  const box=document.getElementById('accountCard'); if(!box) return;
+  let h='<h3>☁️ الحساب والمزامنة</h3>';
+  if(!configured){
+    h+='<p class="small">المزامنة غير مفعّلة بعد: لم يتم ضبط firebaseConfig. التطبيق يعمل محلياً بشكل طبيعي.</p>';
+  }else if(!ready){
+    h+='<p class="small">جارٍ التحقق من الحساب...</p>';
+  }else if(!user){
+    h+='<p class="small">بياناتكِ محفوظة على هذا الجهاز فقط. سجّلي الدخول لمزامنتها بين أجهزتكِ.</p>'+
+       '<button class="btn" data-acc="login">🔐 تسجيل الدخول ومزامنة البيانات</button>';
+  }else{
+    const name=user.displayName||user.email||'مستخدم';
+    h+='<div class="acc-row"><span class="acc-user">👤 '+esc(name)+'</span>'+
+       '<button class="btn danger" data-acc="delete"'+(deleting?' disabled':'')+'>🗑️ حذف الحساب</button></div>'+
+       (user.displayName&&user.email?'<p class="small" style="margin:2px 0 8px">'+esc(user.email)+'</p>':'')+
+       '<div class="row"><span class="label">آخر مزامنة</span><span class="val">'+esc(lastSyncText())+'</span></div>'+
+       '<div class="row"><span class="label">الحالة</span><span class="val">'+esc(statusText())+'</span></div>'+
+       '<div class="actions"><button class="btn" data-acc="sync"'+((busy||deleting)?' disabled':'')+'>🔄 مزامنة الآن</button>'+
+       '<button class="btn alt" data-acc="logout"'+(deleting?' disabled':'')+'>تسجيل الخروج</button></div>';
+  }
+  box.innerHTML=h;
+}
+function bindCard(){
+  const box=document.getElementById('accountCard'); if(!box) return;
+  box.addEventListener('click',e=>{
+    const b=e.target.closest('[data-acc]'); if(!b||b.disabled) return;
+    const a=b.dataset.acc;
+    if(a==='login') openLogin();
+    else if(a==='sync') syncNow(false);
+    else if(a==='logout') doSignOut();
+    else if(a==='delete') openDelete();
+  });
+}
+
+/* ---------- الرفع والمقارنة (الأحدث يفوز) ---------- */
+function markSynced(){lsSet(SYNC_KEY,String(Date.now())); setStatus(timer?'pending':'ok');}
+
+async function doPush(noRetry){
+  const u=user; if(!u||deleting) return;
+  clearTimeout(timer); timer=null;
+  const ts=state.updatedAt||0; if(!ts) return;           // لا شيء يُرفع
+  const payload=JSON.stringify(state);
+  setStatus('syncing');
+  try{
+    const ref=db.collection('users').doc(u.uid);
+    const res=await db.runTransaction(async tx=>{
+      const snap=await tx.get(ref);
+      if(snap.exists&&(Number(snap.data().updatedAt)||0)>ts) return 'newer';  // جهاز آخر رفع نسخة أحدث
+      tx.set(ref,{data:payload,updatedAt:ts,schema:1});
+      return 'ok';
+    });
+    if(user!==u) return;
+    if(res==='newer'&&!noRetry) await reconcile(true);
+    if(status!=='error') markSynced();
+  }catch(e){if(user===u) setStatus('error',errAr(e));}
+}
+function pushNow(){
+  clearTimeout(timer); timer=null;
+  const run1=()=>doPush(false);
+  inflight=(inflight||Promise.resolve()).then(run1,run1);
+  return inflight;
+}
+function schedulePush(){
+  if(!configured||!user||deleting) return;
+  status='pending'; renderAccount();
+  clearTimeout(timer); timer=setTimeout(pushNow,1500);
+}
+async function reconcile(fromPush){
+  const u=user; const ref=db.collection('users').doc(u.uid);
+  const snap=await ref.get();
+  if(user!==u) return;
+  const cloudTs=snap.exists?(Number(snap.data().updatedAt)||0):0;
+  const localTs=state.updatedAt||0;
+  if(cloudTs>localTs){
+    const o=JSON.parse(snap.data().data);
+    const s=normalizeState(o); s.updatedAt=cloudTs;
+    state=s; save({keepStamp:true}); renderAll();
+  }else if(localTs>cloudTs&&!fromPush){
+    await doPush(true);
+  }
+}
+async function syncNow(silent){
+  if(!configured||!user||deleting||busy) return;
+  busy=true; setStatus('syncing');
+  try{
+    try{await inflight;}catch(e){}
+    await reconcile(false);
+    if(status!=='error'){markSynced(); if(!silent) toast('تمت المزامنة ✅');}
+    else if(!silent) toast('تعذّرت المزامنة');
+  }catch(e){
+    setStatus('error',errAr(e)); if(!silent) toast('تعذّرت المزامنة');
+  }
+  busy=false; renderAccount();
+}
+
+/* ---------- حالة الدخول ---------- */
+async function onAuth(u){
+  user=u; ready=true;
+  if(!u){clearTimeout(timer); timer=null; status='idle'; renderAccount(); return;}
+  renderAccount();
+  const owner=lsGet(OWNER_KEY);
+  if(owner&&owner!==u.uid){            // بيانات الجهاز تخص حساباً آخر: لا تُدمج ولا تُرفع
+    state=defaultState(); save({keepStamp:true}); lsDel(SYNC_KEY); renderAll();
+  }
+  lsSet(OWNER_KEY,u.uid);
+  await syncNow(true);
+}
+async function doSignOut(){
+  try{if(timer) await pushNow();}catch(e){}
+  try{await auth.signOut(); toast('تم تسجيل الخروج');}catch(e){toast(errAr(e));}
+}
+
+/* ---------- نافذة تسجيل الدخول ---------- */
+function openLogin(){
+  openModal(
+    '<h3>🔐 تسجيل الدخول والمزامنة</h3>'+
+    '<p class="small">سجّلي الدخول لحفظ تقدّمكِ في السحابة ومتابعته من أي جهاز.</p>'+
+    '<button class="btn google" id="accGoogle" style="width:100%">تسجيل الدخول عبر Google</button>'+
+    '<p class="small" style="text-align:center;margin:12px 0 0">أو بالبريد الإلكتروني</p>'+
+    '<label>البريد الإلكتروني</label><input id="accEmail" type="email" autocomplete="email" dir="ltr">'+
+    '<label>كلمة المرور</label><input id="accPass" type="password" autocomplete="current-password" dir="ltr">'+
+    '<div class="actions"><button class="btn" id="accIn">دخول</button>'+
+    '<button class="btn alt" id="accUp">إنشاء حساب</button>'+
+    '<button class="btn alt" id="accClose">إغلاق</button></div>'+
+    '<p class="small" style="margin-top:8px"><a href="#" id="accForgot">نسيتُ كلمة المرور</a></p>'+
+    '<p class="acc-msg" id="accMsg"></p>');
+  const val=id=>q(id).value.trim();
+  q('#accClose').onclick=closeModal;
+  q('#accGoogle').onclick=()=>run(async()=>{
+    const pr=new firebase.auth.GoogleAuthProvider();
+    try{await auth.signInWithPopup(pr);}
+    catch(e){if(e.code==='auth/popup-blocked'){await auth.signInWithRedirect(pr);return;} throw e;}
+    closeModal();
+  });
+  q('#accIn').onclick=()=>run(async()=>{
+    const em=val('#accEmail'),pw=q('#accPass').value;
+    if(!em||!pw){msg('أدخلي البريد وكلمة المرور');return;}
+    await auth.signInWithEmailAndPassword(em,pw); closeModal();
+  });
+  q('#accUp').onclick=()=>run(async()=>{
+    const em=val('#accEmail'),pw=q('#accPass').value;
+    if(!em||!pw){msg('أدخلي البريد وكلمة المرور');return;}
+    await auth.createUserWithEmailAndPassword(em,pw); closeModal();
+  });
+  q('#accForgot').onclick=e=>{
+    e.preventDefault();
+    run(async()=>{
+      const em=val('#accEmail'); if(!em){msg('اكتبي بريدكِ أولاً');return;}
+      await auth.sendPasswordResetEmail(em); msg('أُرسل رابط إعادة التعيين إلى بريدكِ',true);
+    });
+  };
+}
+
+/* ---------- حذف الحساب ---------- */
+function openDelete(){
+  openModal(
+    '<h3>⚠️ حذف الحساب</h3>'+
+    '<p>سيتم حذف بياناتكِ من السحابة ثم حذف حسابكِ نهائياً، ولا يمكن التراجع عن ذلك.</p>'+
+    '<p class="small">النسخة المحفوظة على هذا الجهاز لا تُحذف، ويمكنكِ تصديرها من الإعدادات قبل المتابعة.</p>'+
+    '<div class="actions"><button class="btn danger" id="accDelOk">نعم، احذفي حسابي نهائياً</button>'+
+    '<button class="btn alt" id="accDelNo">إلغاء</button></div>'+
+    '<p class="acc-msg" id="accMsg"></p>',true);
+  q('#accDelNo').onclick=closeModal;
+  q('#accDelOk').onclick=doDelete;
+}
+async function doDelete(){
+  const u=user; if(!u) return;
+  deleting=true; clearTimeout(timer); timer=null; renderAccount();
+  lock(true); msg('');
+  try{
+    try{await inflight;}catch(e){}
+    await db.collection('users').doc(u.uid).delete();     // 1) وثيقة Firestore أولاً
+    try{await u.delete();}                                 // 2) ثم حساب Authentication
+    catch(e){
+      if(e.code==='auth/requires-recent-login'){openReauth(u);return;}
+      throw e;
+    }
+    finishDelete();
+  }catch(e){deleting=false; renderAccount(); lock(false); msg(errAr(e));}
+}
+function openReauth(u){
+  const google=((u.providerData[0]||{}).providerId)==='google.com';
+  openModal(
+    '<h3>🔒 تأكيد الهوية</h3>'+
+    '<p class="small">لأسباب أمنية يلزم تأكيد هويتكِ لإتمام حذف الحساب.</p>'+
+    (google
+      ?'<button class="btn google" id="accReG" style="width:100%">تأكيد عبر Google</button>'
+      :'<label>كلمة المرور</label><input id="accRePass" type="password" autocomplete="current-password" dir="ltr">'+
+       '<div class="actions"><button class="btn danger" id="accReOk">تأكيد وحذف الحساب</button></div>')+
+    '<div class="actions"><button class="btn alt" id="accReNo">إلغاء</button></div>'+
+    '<p class="acc-msg" id="accMsg"></p>',true);
+  q('#accReNo').onclick=()=>{deleting=false; closeModal(); renderAccount();};
+  if(google){
+    q('#accReG').onclick=()=>run(async()=>{
+      await u.reauthenticateWithPopup(new firebase.auth.GoogleAuthProvider());
+      await u.delete(); finishDelete();
+    });
+  }else{
+    q('#accReOk').onclick=()=>run(async()=>{
+      const pw=q('#accRePass').value; if(!pw){msg('أدخلي كلمة المرور');return;}
+      await u.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(u.email,pw));
+      await u.delete(); finishDelete();
+    });
+  }
+}
+function finishDelete(){
+  deleting=false; user=null; status='idle';
+  lsDel(OWNER_KEY); lsDel(SYNC_KEY);
+  closeModal(); renderAccount();
+  toast('تم حذف الحساب وبياناته السحابية');
+}
+
+/* ---------- التشغيل ---------- */
+function init(){
+  window.CloudSync={schedulePush,renderAccount,syncNow,pushNow};
+  bindCard(); renderAccount();
+  if(!configured) return;
+  try{
+    firebase.initializeApp(cfg);
+    auth=firebase.auth(); auth.languageCode='ar';
+    db=firebase.firestore();
+  }catch(e){console.error(e); configured=false; renderAccount(); return;}
+  auth.onAuthStateChanged(onAuth);
+  auth.getRedirectResult().catch(e=>toast(errAr(e)));
+  window.addEventListener('online',()=>{if(user&&status==='error') syncNow(true);});
+  document.addEventListener('visibilitychange',()=>{
+    if(!user||deleting) return;
+    if(document.hidden){if(timer) pushNow();} else syncNow(true);
+  });
+}
+init();
+})();
 </script>
 </body>
 </html>
